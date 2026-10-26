@@ -1,0 +1,1986 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Office Rage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden; background: #1b1d24;
+    font-family: 'Bangers', Impact, 'Arial Black', sans-serif; color: #fff;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  canvas#game { display: block; position: fixed; inset: 0; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; padding: 12px 16px; }
+  .hud-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .stat .label { font-size: 15px; letter-spacing: 2px; opacity: .9; text-shadow: 2px 2px 0 #000; }
+  .stat .val {
+    font-size: clamp(30px, 6vw, 48px); line-height: 1; letter-spacing: 1px;
+    text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  }
+  .stat.center { text-align: center; }
+  .stat.right { text-align: right; }
+  #best { font-size: 16px; opacity: .85; text-shadow: 2px 2px 0 #000; }
+  #time.warn { color: #ff4b4b; animation: pulse .4s infinite alternate; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }
+  #combo { color: #ffde3b; }
+  #comboBar { height: 6px; width: 120px; margin: 4px 0 0 auto; background: rgba(0,0,0,.45); border-radius: 3px; overflow: hidden; }
+  #comboFill { height: 100%; width: 0; background: #ffde3b; }
+  #powerups { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+  .chip {
+    background: rgba(0,0,0,.6); border: 2px solid currentColor; border-radius: 999px;
+    padding: 3px 12px; font-size: 20px; letter-spacing: 1px;
+  }
+  #hint {
+    position: fixed; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 18px;
+    letter-spacing: 1px; opacity: .8; text-shadow: 2px 2px 0 #000; pointer-events: none;
+  }
+
+  #fx { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .pop {
+    position: absolute; left: 0; top: 0; font-size: 26px; color: #fff; white-space: nowrap;
+    text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    will-change: transform, opacity;
+  }
+  .pop.big { font-size: 36px; color: #ffde3b; }
+  .pop.gold { color: #ffb347; }
+  .pop.small { font-size: 18px; opacity: .85; }
+  .pop.power { font-size: 30px; color: #7fe0ff; }
+  .pop.yell {
+    font-family: 'Comic Sans MS', 'Chalkboard SE', system-ui, sans-serif; font-weight: bold;
+    font-size: 16px; color: #111; background: #fff; border: 2px solid #111; border-radius: 12px;
+    padding: 3px 10px; text-shadow: none;
+  }
+
+  #banner {
+    position: fixed; left: 50%; top: 34%; transform: translate(-50%, -50%);
+    font-size: clamp(38px, 9vw, 96px); color: #ffde3b; white-space: nowrap; pointer-events: none;
+    text-shadow: 4px 4px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+    opacity: 0; letter-spacing: 2px;
+  }
+  #banner.show { animation: bannerPop 1.4s ease-out forwards; }
+  @keyframes bannerPop {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(2.4) rotate(-8deg); }
+    14%  { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(-3deg); }
+    75%  { opacity: 1; transform: translate(-50%, -52%) scale(1.03) rotate(-3deg); }
+    100% { opacity: 0; transform: translate(-50%, -62%) scale(1.05) rotate(-3deg); }
+  }
+
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(15,16,22,.55); padding: 16px; z-index: 5;
+  }
+  .overlay.hidden { display: none; }
+  .card {
+    background: #fffdf5; color: #1b1d24; border: 4px solid #1b1d24; box-shadow: 8px 8px 0 #1b1d24;
+    border-radius: 6px; max-width: 520px; width: 100%; padding: 22px 24px; text-align: center;
+    transform: rotate(-1deg); max-height: calc(100vh - 32px); overflow-x: hidden; overflow-y: auto;
+  }
+  .card h1 {
+    font-size: clamp(52px, 13vw, 88px); color: #e63946; line-height: .9; letter-spacing: 2px;
+    text-shadow: 3px 3px 0 #1b1d24;
+  }
+  .card h2 { font-size: clamp(40px, 10vw, 64px); color: #e63946; line-height: 1; text-shadow: 3px 3px 0 #1b1d24; }
+  .card .body {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.45;
+    margin: 12px 0; text-align: left;
+  }
+  .card .body p { margin: 6px 0; }
+  .card .tag { font-size: 20px; letter-spacing: 1px; margin-top: 6px; }
+  .card ul { list-style: none; margin: 8px 0; }
+  .card li { margin: 4px 0; }
+  .card kbd {
+    font-family: inherit; font-size: 13px; background: #1b1d24; color: #fff; border-radius: 3px;
+    padding: 1px 6px;
+  }
+  .final { font-size: clamp(48px, 12vw, 72px); line-height: 1; margin: 6px 0; }
+  /* inline-block so the pulse only scales the text itself, not a full-width box */
+  .newbest { display: inline-block; color: #e63946; font-size: 26px; animation: pulse .4s infinite alternate; }
+  .newbest[hidden] { display: none; }
+  .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin: 12px 0;
+    font-family: system-ui, sans-serif; font-size: 15px; text-align: left;
+  }
+  .grid b { font-family: 'Bangers', Impact, sans-serif; font-size: 22px; font-weight: normal; letter-spacing: 1px; }
+  button {
+    font-family: inherit; font-size: 30px; padding: 8px 34px; margin-top: 8px; letter-spacing: 2px;
+    background: #e63946; color: #fff; border: 3px solid #1b1d24; box-shadow: 4px 4px 0 #1b1d24;
+    border-radius: 4px; cursor: pointer;
+  }
+  button:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #1b1d24; }
+  .small-note { font-family: system-ui, sans-serif; font-size: 12px; opacity: .65; margin-top: 8px; }
+
+  /* typing duel against HR / the boss */
+  #duel { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+  #duel.hidden { display: none; }
+  .duel-top { position: absolute; top: 96px; left: 0; right: 0; padding: 0 16px; text-align: center; }
+  .duel-round { font-size: 18px; letter-spacing: 3px; color: #ffde3b; text-shadow: 2px 2px 0 #000; }
+  .duel-name {
+    font-size: clamp(30px, 7vw, 54px); line-height: 1; color: #ff4b4b; letter-spacing: 1px;
+    text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  }
+  .duel-says {
+    display: inline-block; margin-top: 8px; max-width: 520px; padding: 6px 14px;
+    font-family: 'Comic Sans MS', 'Chalkboard SE', system-ui, sans-serif; font-weight: bold; font-size: 16px;
+    color: #111; background: #fff; border: 2px solid #111; border-radius: 14px;
+  }
+  .duel-panel {
+    position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
+    width: min(680px, calc(100% - 32px)); padding: 12px 16px 14px; text-align: center; pointer-events: auto;
+    background: #fffdf5; color: #1b1d24; border: 4px solid #1b1d24; box-shadow: 6px 6px 0 #1b1d24; border-radius: 6px;
+  }
+  .duel-prompt { font-size: 26px; letter-spacing: 2px; color: #e63946; }
+  .duel-prompt.win { color: #1f9d55; }
+  .duel-phrase {
+    margin: 6px 0 10px; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-size: clamp(17px, 3.2vw, 26px); line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+  }
+  .duel-phrase .ok { color: #1f9d55; }
+  .duel-phrase .cur { background: #ffde3b; border-radius: 2px; }
+  .duel-phrase .todo { color: #8a8d96; }
+  .duel-phrase.err { animation: shake .25s; }
+  .duel-phrase.err .cur { background: #ff6b6b; }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  #duelInput {
+    width: 100%; padding: 8px 10px; font-family: ui-monospace, Consolas, monospace; font-size: 16px;
+    color: #1b1d24; background: #fff; border: 2px solid #1b1d24; border-radius: 4px; outline: none;
+    user-select: text; -webkit-user-select: text;
+  }
+  #duelInput:disabled { background: #eee9dc; }
+  .duel-bar { height: 12px; margin-top: 10px; overflow: hidden; background: #e2ddd0; border: 2px solid #1b1d24; border-radius: 6px; }
+  #duelFill { height: 100%; width: 100%; background: #2a9d8f; }
+  #duelFill.low { background: #e63946; }
+  .duel-meta { display: flex; justify-content: space-between; margin-top: 4px; font-size: 18px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div class="hud-row">
+    <div class="stat">
+      <div class="label">SCORE</div>
+      <div class="val" id="score">0</div>
+      <div id="best">BEST 0</div>
+    </div>
+    <div class="stat center">
+      <div class="label">TIME</div>
+      <div class="val" id="time">90</div>
+    </div>
+    <div class="stat right">
+      <div class="label">COMBO</div>
+      <div class="val" id="combo">x1</div>
+      <div id="comboBar"><div id="comboFill"></div></div>
+    </div>
+  </div>
+  <div id="powerups"></div>
+</div>
+<div id="hint">← → / A D to swerve · click / Space to swing · touch: drag to steer, tap to swing</div>
+<div id="fx"></div>
+<div id="duel" class="hidden">
+  <div class="duel-top">
+    <div class="duel-round" id="duelRound">ROUND 1</div>
+    <div class="duel-name" id="duelName">HR</div>
+    <div class="duel-says" id="duelSays"></div>
+  </div>
+  <div class="duel-panel" id="duelPanel">
+    <div class="duel-prompt" id="duelPrompt">GET READY…</div>
+    <div class="duel-phrase" id="duelPhrase"></div>
+    <input id="duelInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+      placeholder="type the insult here…" aria-label="Type the insult">
+    <div class="duel-bar"><div id="duelFill"></div></div>
+    <div class="duel-meta"><span id="duelTime"></span><span>WIN: +30 SECONDS</span></div>
+  </div>
+</div>
+<div id="banner"></div>
+
+<div id="menu" class="overlay">
+  <div class="card">
+    <h1>OFFICE<br>RAGE</h1>
+    <div class="tag">Twelve years. Zero raises. One printer jam too many.</div>
+    <div class="body">
+      <p>You've snapped. Security arrives in <b>90 seconds</b>. You can't stop running, so make it count:
+        plough through desks, monitors, chairs, plants and coworkers.</p>
+      <ul>
+        <li><kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> to swerve · drag on touch screens</li>
+        <li>💥 Smash things in quick succession to build your <b>combo multiplier</b></li>
+        <li>👊 <b>Click</b>, tap or <kbd>Space</kbd> to punch, or swing whatever weapon you're holding</li>
+        <li>🖱️ <b>Mouse flail</b>: whirl it on its cord to clobber everything around you</li>
+        <li>⌨️ <b>Keyboard</b>: a wide swing that also fires keycaps down the office</li>
+        <li>🗯️ Every 30 s, <b>HR or the boss</b> blocks your path. Type the insult before time runs out to earn <b>+30 s</b>. It gets harder every time.</li>
+      </ul>
+    </div>
+    <div class="tag" id="menuBest"></div>
+    <button id="startBtn">START RAGING</button>
+    <div class="small-note">or press Space / Enter</div>
+  </div>
+</div>
+
+<div id="over" class="overlay hidden">
+  <div class="card">
+    <h2>TIME'S UP!</h2>
+    <div class="tag">Security escorts you out. Worth it.</div>
+    <div class="final" id="finalScore">0</div>
+    <div class="newbest" id="newBest" hidden>NEW PERSONAL BEST!</div>
+    <div class="grid">
+      <div>Office stuff wrecked</div><b id="stItems">0</b>
+      <div>Coworkers tossed</div><b id="stPeople">0</b>
+      <div>Longest combo</div><b id="stCombo">0</b>
+      <div>Distance raged</div><b id="stDist">0 m</b>
+      <div>Comebacks landed</div><b id="stDuels">0 / 0</b>
+      <div>Best score</div><b id="stBest">0</b>
+    </div>
+    <button id="againBtn">RAGE AGAIN</button>
+    <div class="small-note">or press Space / Enter</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ---------------------------------------------------------------- config
+const CFG = {
+  runSpeed: 15,
+  strafeSpeed: 12,
+  laneHalf: 7.8,
+  floorHalf: 9,
+  chunkLen: 24,
+  gameTime: 90,
+  gravity: 28,
+  comboWindow: 1.6,
+  viewAhead: 110,
+  cleanupBehind: 14,
+  hipH: 0.96,
+};
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = (a) => a[(Math.random() * a.length) | 0];
+const chance = (p) => Math.random() < p;
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const V3 = THREE.Vector3;
+const PI = Math.PI;
+
+// ---------------------------------------------------------------- renderer / scene
+const canvas = document.getElementById('game');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.autoClear = false; // world pass, then the first-person arms on top
+
+const scene = new THREE.Scene();
+const BG = 0xdfe5ec;
+scene.background = new THREE.Color(BG);
+scene.fog = new THREE.Fog(BG, 45, 105);
+
+const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 160);
+camera.rotation.order = 'YXZ';
+let baseFov = 75;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a90a0, 1.5));
+const sun = new THREE.DirectionalLight(0xfff6e8, 1.8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 32, bottom: -32, near: 1, far: 80 });
+sun.shadow.bias = -0.0006;
+scene.add(sun, sun.target);
+
+// ---------------------------------------------------------------- shared geometry / materials
+const BOX = new THREE.BoxGeometry(1, 1, 1);
+const CYL = new THREE.CylinderGeometry(0.5, 0.5, 1, 16);
+const SPH = new THREE.SphereGeometry(0.5, 12, 9);
+const mats = new Map();
+function mat(c) {
+  if (typeof c !== 'number') return c;
+  let m = mats.get(c);
+  if (!m) { m = new THREE.MeshLambertMaterial({ color: c }); mats.set(c, m); }
+  return m;
+}
+const glows = new Map();
+function glow(c) {
+  let m = glows.get(c);
+  if (!m) { m = new THREE.MeshBasicMaterial({ color: c }); glows.set(c, m); }
+  return m;
+}
+function part(geo, w, h, d, c, x, y, z, parent) {
+  const m = new THREE.Mesh(geo, mat(c));
+  m.scale.set(w, h, d);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  parent.add(m);
+  return m;
+}
+const bx = (p, w, h, d, c, x = 0, y = 0, z = 0) => part(BOX, w, h, d, c, x, y, z, p);
+const cy = (p, r, h, c, x = 0, y = 0, z = 0) => part(CYL, r * 2, h, r * 2, c, x, y, z, p);
+const sp = (p, r, c, x = 0, y = 0, z = 0) => part(SPH, r * 2, r * 2, r * 2, c, x, y, z, p);
+
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+const carpetTex = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#7f899b'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 1600; i++) {
+    const v = (100 + Math.random() * 50) | 0;
+    g.fillStyle = `rgba(${v},${v + 6},${v + 22},0.35)`;
+    g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+  }
+  g.strokeStyle = 'rgba(40,45,60,0.35)'; g.lineWidth = 2; g.strokeRect(1, 1, w - 2, h - 2);
+});
+carpetTex.wrapS = carpetTex.wrapT = THREE.RepeatWrapping;
+carpetTex.repeat.set((CFG.floorHalf * 2) / 3, CFG.chunkLen / 3);
+const floorMat = new THREE.MeshLambertMaterial({ map: carpetTex });
+const ceilTex = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#eceae4'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 500; i++) { g.fillStyle = 'rgba(150,145,135,0.25)'; g.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5); }
+  g.strokeStyle = '#b9b5ab'; g.lineWidth = 4; g.strokeRect(0, 0, w, h);
+});
+ceilTex.wrapS = ceilTex.wrapT = THREE.RepeatWrapping;
+ceilTex.repeat.set((CFG.floorHalf * 2) / 1.5, CFG.chunkLen / 1.5);
+const ceilMat = new THREE.MeshBasicMaterial({ map: ceilTex, color: 0xd9d6cf });
+
+const POSTER_DEFS = [
+  ['SYNERGY', '#e94f37', 'Together we leverage more'],
+  ['TEAMWORK', '#3f88c5', 'There is no I in team'],
+  ['HUSTLE', '#2a9d8f', 'Weekends are a mindset'],
+  ['DEADLINES', '#f4a261', 'Closer than they appear'],
+  ['PASSION', '#9b5de5', 'Unpaid overtime is love'],
+  ['SMILE', '#e9c46a', 'Your review is Monday'],
+];
+const posterMats = POSTER_DEFS.map(([t, c, s]) => new THREE.MeshLambertMaterial({
+  map: canvasTex(256, 340, (g, w, h) => {
+    g.fillStyle = c; g.fillRect(0, 0, w, h);
+    g.fillStyle = 'rgba(255,255,255,.22)';
+    g.beginPath(); g.arc(w / 2, 130, 80, 0, 7); g.fill();
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(w / 2 - 50, 110, 100, 70);
+    g.fillStyle = '#111'; g.fillRect(0, 250, w, 90);
+    g.fillStyle = '#fff'; g.textAlign = 'center';
+    g.font = 'bold 42px Impact, Arial Black, sans-serif'; g.fillText(t, w / 2, 293);
+    g.font = '16px Arial, sans-serif'; g.fillText(s, w / 2, 322);
+    g.strokeStyle = '#222'; g.lineWidth = 10; g.strokeRect(0, 0, w, h);
+  }),
+}));
+const POSTER_GEO = new THREE.PlaneGeometry(1.2, 1.6);
+
+const screenMats = [
+  (g, w, h) => { // spreadsheet
+    g.fillStyle = '#f4fff4'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#1e7b3c'; g.fillRect(0, 0, w, 14);
+    g.strokeStyle = '#9cc9a8'; g.lineWidth = 1;
+    for (let x = 0; x < w; x += 24) { g.beginPath(); g.moveTo(x, 14); g.lineTo(x, h); g.stroke(); }
+    for (let y = 14; y < h; y += 10) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+  },
+  (g, w, h) => { // code
+    g.fillStyle = '#1e2333'; g.fillRect(0, 0, w, h);
+    const cols = ['#7fd1ff', '#ffcb6b', '#c3e88d', '#f78c6c'];
+    for (let y = 8; y < h; y += 9) {
+      g.fillStyle = pick(cols); g.fillRect(8 + Math.random() * 20, y, 30 + Math.random() * 80, 4);
+    }
+  },
+  (g, w, h) => { // email
+    g.fillStyle = '#eef3fb'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#2f6fdf'; g.fillRect(0, 0, 40, h);
+    for (let y = 8; y < h; y += 14) { g.fillStyle = y < 40 ? '#222' : '#888'; g.fillRect(48, y, 60 + Math.random() * 60, 5); }
+    g.fillStyle = '#e63946'; g.fillRect(48, 6, 10, 8);
+  },
+].map((draw) => new THREE.MeshBasicMaterial({ map: canvasTex(128, 80, draw) }));
+
+// ---------------------------------------------------------------- environment chunks
+const FLOOR_GEO = new THREE.PlaneGeometry(CFG.floorHalf * 2, CFG.chunkLen);
+FLOOR_GEO.rotateX(-PI / 2);
+const CEIL_GEO = new THREE.PlaneGeometry(CFG.floorHalf * 2 + 0.8, CFG.chunkLen);
+CEIL_GEO.rotateX(PI / 2);
+const WALL_H = 3.4;
+const chunks = [];
+let nextChunk = 0;
+
+function buildEnv(z0) {
+  const g = new THREE.Group();
+  const L = CFG.chunkLen, fh = CFG.floorHalf, zc = z0 - L / 2;
+  const floor = new THREE.Mesh(FLOOR_GEO, floorMat);
+  floor.position.set(0, 0, zc);
+  floor.receiveShadow = true;
+  g.add(floor);
+  // ceiling + fluorescent panels (never cast shadows, or the sun would be blocked)
+  const ceil = new THREE.Mesh(CEIL_GEO, ceilMat);
+  ceil.position.set(0, WALL_H, zc);
+  g.add(ceil);
+  for (let k = 0; k < 4; k++) {
+    for (const x of [-4.5, 0, 4.5]) {
+      const lp = new THREE.Mesh(BOX, glow(0xfdfdf6));
+      lp.scale.set(1.2, 0.04, 0.6);
+      lp.position.set(x, WALL_H - 0.02, z0 - 3 - k * 6);
+      g.add(lp);
+    }
+  }
+  for (const s of [-1, 1]) {
+    bx(g, 0.4, WALL_H, L, 0xece6d8, s * (fh + 0.2), WALL_H / 2, zc).castShadow = false;
+    bx(g, 0.06, 0.15, L, 0x5a5f6b, s * (fh - 0.02), 0.075, zc).castShadow = false;
+    bx(g, 0.9, WALL_H, 0.9, 0xd6cfbf, s * (fh - 0.1), WALL_H / 2, z0);
+  }
+  // windows on the left wall
+  for (const k of [0.27, 0.73]) {
+    const wz = z0 - L * k;
+    const win = new THREE.Mesh(BOX, glow(0xc4e6ff));
+    win.scale.set(0.05, 1.7, 7.5);
+    win.position.set(-fh + 0.01, 1.9, wz);
+    g.add(win);
+    for (let m = -3.75; m <= 3.76; m += 2.5) bx(g, 0.1, 1.7, 0.12, 0x8a8f99, -fh + 0.04, 1.9, wz + m).castShadow = false;
+    bx(g, 0.18, 0.08, 7.6, 0x8a8f99, -fh + 0.06, 1.02, wz).castShadow = false;
+  }
+  // posters / clocks on the right wall
+  for (const k of [0.25, 0.5, 0.75]) {
+    const wz = z0 - L * k;
+    if (chance(0.6)) {
+      const p = new THREE.Mesh(POSTER_GEO, pick(posterMats));
+      p.position.set(fh - 0.01, 1.9, wz);
+      p.rotation.y = -PI / 2;
+      g.add(p);
+    } else if (chance(0.5)) {
+      const c = cy(g, 0.32, 0.06, 0xffffff, fh - 0.03, 2.3, wz);
+      c.rotation.z = PI / 2;
+      bx(g, 0.02, 0.22, 0.04, 0x111111, fh - 0.07, 2.36, wz);
+      bx(g, 0.02, 0.04, 0.17, 0x111111, fh - 0.07, 2.3, wz + 0.07);
+    }
+  }
+  scene.add(g);
+  return g;
+}
+
+// ---------------------------------------------------------------- entity builders (origin at centre)
+function buildDesk() {
+  const g = new THREE.Group(), H = 0.76, hy = H / 2;
+  const top = pick([0xc9a36b, 0xe3d6bd, 0x8a6a4a, 0xf2f2f2]);
+  bx(g, 2.2, 0.06, 1.1, top, 0, hy - 0.03);
+  bx(g, 0.06, H - 0.06, 1.0, 0x6f7580, -1.05, -0.03);
+  bx(g, 0.06, H - 0.06, 1.0, 0x6f7580, 1.05, -0.03);
+  bx(g, 2.0, 0.4, 0.03, 0x6f7580, 0, 0.02, -0.48);
+  return { g, hx: 1.1, hy, hz: 0.55, top: H };
+}
+function buildMonitor() {
+  const g = new THREE.Group();
+  bx(g, 0.32, 0.03, 0.22, 0x222226, 0, -0.285);
+  bx(g, 0.06, 0.2, 0.05, 0x222226, 0, -0.17, -0.02);
+  bx(g, 0.82, 0.5, 0.05, 0x18181b, 0, 0.05);
+  const scr = new THREE.Mesh(BOX, pick(screenMats));
+  scr.scale.set(0.76, 0.44, 0.01);
+  scr.position.set(0, 0.05, 0.026);
+  g.add(scr);
+  return { g, hx: 0.42, hy: 0.3, hz: 0.12 };
+}
+function buildLaptop() {
+  const g = new THREE.Group();
+  bx(g, 0.42, 0.03, 0.3, 0x9aa0a8, 0, -0.12, 0.05);
+  const lid = new THREE.Group(); lid.position.set(0, -0.105, -0.1); lid.rotation.x = -0.25; g.add(lid);
+  bx(lid, 0.42, 0.28, 0.02, 0x9aa0a8, 0, 0.14, 0);
+  const scr = new THREE.Mesh(BOX, pick(screenMats));
+  scr.scale.set(0.38, 0.24, 0.005); scr.position.set(0, 0.14, 0.012); lid.add(scr);
+  return { g, hx: 0.22, hy: 0.14, hz: 0.18 };
+}
+function buildKeyboard() {
+  const g = new THREE.Group();
+  bx(g, 0.6, 0.03, 0.2, 0x2a2a2e);
+  bx(g, 0.08, 0.03, 0.12, 0x2a2a2e, 0.42, 0, 0.02);
+  return { g, hx: 0.3, hy: 0.015, hz: 0.1 };
+}
+function buildMug() {
+  const g = new THREE.Group();
+  cy(g, 0.06, 0.13, pick([0xffffff, 0xe63946, 0x3f88c5, 0xffbe0b]));
+  return { g, hx: 0.07, hy: 0.065, hz: 0.07 };
+}
+function buildPapers() {
+  const g = new THREE.Group();
+  const n = 3 + ((Math.random() * 4) | 0);
+  for (let i = 0; i < n; i++) bx(g, 0.3, 0.025, 0.4, i % 3 ? 0xf7f7f2 : 0xfff3b0, rand(-0.02, 0.02), -0.06 + i * 0.03).rotation.y = rand(-0.15, 0.15);
+  return { g, hx: 0.17, hy: 0.08, hz: 0.21 };
+}
+function buildChair() {
+  const g = new THREE.Group(), c = pick([0x26282e, 0x34495e, 0x5d2e46, 0x2f4f4f]);
+  bx(g, 0.64, 0.05, 0.08, 0x333333, 0, -0.47);
+  bx(g, 0.08, 0.05, 0.64, 0x333333, 0, -0.47);
+  cy(g, 0.04, 0.4, 0x777777, 0, -0.25);
+  bx(g, 0.56, 0.09, 0.52, c, 0, -0.02);
+  bx(g, 0.52, 0.56, 0.08, c, 0, 0.3, -0.25);
+  return { g, hx: 0.32, hy: 0.5, hz: 0.32, seat: 0.53 };
+}
+function buildPlant() {
+  const g = new THREE.Group();
+  cy(g, 0.24, 0.42, 0xb5603a, 0, -0.39);
+  const leaf = pick([0x3a8f3e, 0x4caf50, 0x2e7d32]);
+  sp(g, 0.32, leaf, 0, 0.05);
+  sp(g, 0.24, leaf, 0.14, 0.32, 0.05);
+  sp(g, 0.22, leaf, -0.14, 0.38, -0.05);
+  return { g, hx: 0.3, hy: 0.6, hz: 0.3 };
+}
+function buildCooler() {
+  const g = new THREE.Group();
+  bx(g, 0.42, 0.95, 0.42, 0xf4f4f4, 0, -0.2);
+  bx(g, 0.2, 0.06, 0.05, 0x3f88c5, 0, 0.0, 0.22);
+  const bottle = new THREE.Mesh(CYL, new THREE.MeshLambertMaterial({ color: 0x8ecdf7, transparent: true, opacity: 0.8 }));
+  bottle.scale.set(0.34, 0.45, 0.34); bottle.position.y = 0.5; bottle.castShadow = true; g.add(bottle);
+  return { g, hx: 0.22, hy: 0.7, hz: 0.22 };
+}
+function buildPrinter() {
+  const g = new THREE.Group();
+  bx(g, 1.1, 0.8, 0.8, 0xdedede, 0, -0.05);
+  bx(g, 1.1, 0.12, 0.8, 0x9fa4ab, 0, 0.4);
+  bx(g, 0.5, 0.04, 0.35, 0xf7f7f2, 0.1, 0.48, 0.1);
+  bx(g, 0.25, 0.08, 0.02, 0x35d07f, -0.35, 0.3, 0.41);
+  bx(g, 0.6, 0.1, 0.25, 0x9fa4ab, 0, 0.0, 0.48);
+  return { g, hx: 0.56, hy: 0.46, hz: 0.42 };
+}
+function buildCabinet() {
+  const g = new THREE.Group();
+  bx(g, 0.55, 1.3, 0.62, 0x8b939e);
+  for (let i = 0; i < 4; i++) bx(g, 0.2, 0.04, 0.03, 0xdadada, 0, -0.45 + i * 0.31, 0.32);
+  return { g, hx: 0.28, hy: 0.65, hz: 0.32 };
+}
+function buildCardboard() {
+  const g = new THREE.Group();
+  bx(g, 0.56, 0.45, 0.46, 0xc49a5c);
+  bx(g, 0.57, 0.08, 0.1, 0xd9c08f, 0, 0.19);
+  return { g, hx: 0.28, hy: 0.225, hz: 0.23 };
+}
+function buildTrash() {
+  const g = new THREE.Group();
+  cy(g, 0.2, 0.46, 0x3a3d44);
+  sp(g, 0.09, 0xf7f7f2, 0.05, 0.22, 0);
+  return { g, hx: 0.2, hy: 0.23, hz: 0.2 };
+}
+function buildPartition() {
+  const g = new THREE.Group();
+  bx(g, 2.3, 1.25, 0.07, pick([0x6c7a89, 0x7b8a7a, 0x8a7b8f]));
+  bx(g, 2.32, 0.05, 0.09, 0x3d3f45, 0, 0.64);
+  return { g, hx: 1.15, hy: 0.65, hz: 0.05 };
+}
+function buildTable() {
+  const g = new THREE.Group();
+  bx(g, 4.4, 0.07, 1.6, 0x5a3e2b, 0, 0.345);
+  bx(g, 0.3, 0.7, 0.9, 0x2e2e33, -1.4, -0.03);
+  bx(g, 0.3, 0.7, 0.9, 0x2e2e33, 1.4, -0.03);
+  return { g, hx: 2.2, hy: 0.38, hz: 0.8, top: 0.76 };
+}
+function buildWhiteboard() {
+  const g = new THREE.Group();
+  bx(g, 1.7, 1.05, 0.05, 0xffffff, 0, 0.35);
+  bx(g, 1.76, 0.05, 0.08, 0x9a9a9a, 0, -0.18);
+  bx(g, 0.05, 1.8, 0.05, 0x9a9a9a, -0.8, 0);
+  bx(g, 0.05, 1.8, 0.05, 0x9a9a9a, 0.8, 0);
+  bx(g, 0.9, 0.04, 0.01, 0xe63946, -0.2, 0.55, 0.03);   // squiggly "chart"
+  bx(g, 0.04, 0.6, 0.01, 0x3f88c5, 0.3, 0.3, 0.03);
+  bx(g, 0.6, 0.04, 0.01, 0x2a9d8f, 0.0, 0.15, 0.03);
+  return { g, hx: 0.85, hy: 0.9, hz: 0.12 };
+}
+function buildSofa() {
+  const g = new THREE.Group(), c = pick([0x9c2f2f, 0x2f5f9c, 0x557a46]);
+  bx(g, 2.0, 0.4, 0.85, c, 0, -0.1);
+  bx(g, 2.0, 0.5, 0.2, c, 0, 0.3, -0.33);
+  bx(g, 0.2, 0.3, 0.85, c, -0.95, 0.15);
+  bx(g, 0.2, 0.3, 0.85, c, 0.95, 0.15);
+  return { g, hx: 1.0, hy: 0.4, hz: 0.43 };
+}
+
+const SKINS = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac];
+const SHIRTS = [0x5b8def, 0xef6f6c, 0x56c596, 0xf2c14e, 0x9b72cf, 0xffffff, 0x8fb8de, 0xe58fb4, 0x6d7b8d];
+const PANTS = [0x2d3142, 0x3d405b, 0x4a4e69, 0x22223b, 0x6b5e4a];
+const HAIRS = [0x2b1d0e, 0x4a2f1b, 0x111111, 0xc9a14a, 0x8b8b8b, 0xa0522d];
+
+// origin at the hips, model faces +Z
+function buildPerson(o = {}) {
+  const g = new THREE.Group();
+  const skin = o.skin ?? pick(SKINS), shirt = o.shirt ?? pick(SHIRTS);
+  const pants = o.pants ?? pick(PANTS), hair = o.hair ?? pick(HAIRS);
+  bx(g, 0.5, 0.62, 0.28, shirt, 0, 0.33);
+  bx(g, 0.52, 0.12, 0.3, pants, 0, 0.02);
+  if (o.tie) bx(g, 0.08, 0.42, 0.02, o.tie, 0, 0.4, 0.15);
+  if (o.belly) bx(g, 0.44, 0.3, 0.12, shirt, 0, 0.22, 0.16);
+  bx(g, 0.12, 0.12, 0.12, skin, 0, 0.69);
+  const head = new THREE.Group(); head.position.y = 0.84; g.add(head);
+  bx(head, 0.3, 0.32, 0.3, skin);
+  if (!o.bald) {
+    bx(head, 0.32, 0.1, 0.32, hair, 0, 0.17, -0.01);
+    bx(head, 0.32, 0.22, 0.06, hair, 0, 0.05, -0.14);
+    if (chance(0.3) && !o.angry) bx(head, 0.12, 0.25, 0.1, hair, 0, -0.08, -0.2);
+  } else {
+    bx(head, 0.32, 0.12, 0.2, hair, 0, -0.02, -0.08);
+  }
+  bx(head, 0.05, 0.05, 0.02, 0x111111, -0.07, 0.03, 0.155);
+  bx(head, 0.05, 0.05, 0.02, 0x111111, 0.07, 0.03, 0.155);
+  if (o.angry) {
+    bx(head, 0.11, 0.035, 0.02, 0x111111, -0.07, 0.09, 0.157).rotation.z = -0.5;
+    bx(head, 0.11, 0.035, 0.02, 0x111111, 0.07, 0.09, 0.157).rotation.z = 0.5;
+    bx(head, 0.14, 0.07, 0.02, 0x5a0000, 0, -0.08, 0.157);
+  }
+  const leg = (s) => {
+    const L = new THREE.Group(); L.position.set(s * 0.13, -0.02, 0); g.add(L);
+    bx(L, 0.19, 0.46, 0.21, pants, 0, -0.23);
+    const K = new THREE.Group(); K.position.y = -0.46; L.add(K);
+    bx(K, 0.18, 0.42, 0.2, pants, 0, -0.21);
+    bx(K, 0.2, 0.08, 0.3, 0x1e1e1e, 0, -0.44, 0.04);
+    return [L, K];
+  };
+  const arm = (s) => {
+    const A = new THREE.Group(); A.position.set(s * 0.33, 0.6, 0); g.add(A);
+    bx(A, 0.14, 0.52, 0.16, shirt, 0, -0.24);
+    bx(A, 0.12, 0.12, 0.12, skin, 0, -0.55);
+    return A;
+  };
+  const [legL, kneeL] = leg(-1), [legR, kneeR] = leg(1);
+  const parts = { legL, kneeL, legR, kneeR, armL: arm(-1), armR: arm(1), head };
+  return { g, hx: 0.32, hy: CFG.hipH, hz: 0.24, r: 0.45, parts };
+}
+
+function poseReset(P) {
+  for (const k of ['legL', 'kneeL', 'legR', 'kneeR', 'armL', 'armR', 'head']) P[k].rotation.set(0, 0, 0);
+}
+function poseWalk(P, t, amp = 0.6) {
+  const s = Math.sin(t);
+  P.legL.rotation.x = s * amp; P.legR.rotation.x = -s * amp;
+  P.kneeL.rotation.x = Math.max(0, -s) * amp * 1.2;
+  P.kneeR.rotation.x = Math.max(0, s) * amp * 1.2;
+  P.armL.rotation.x = -s * amp * 0.8; P.armR.rotation.x = s * amp * 0.8;
+  P.armL.rotation.z = 0; P.armR.rotation.z = 0;
+}
+function poseScared(P, t) {
+  P.armL.rotation.set(PI * 0.92 + Math.sin(t * 30) * 0.12, 0, -0.35);
+  P.armR.rotation.set(PI * 0.92 + Math.cos(t * 30) * 0.12, 0, 0.35);
+  P.head.rotation.x = -0.2;
+}
+function poseSeated(P) {
+  P.legL.rotation.x = P.legR.rotation.x = -PI / 2;
+  P.kneeL.rotation.x = P.kneeR.rotation.x = PI / 2;
+}
+function poseFlail(P, t) {
+  P.armL.rotation.set(Math.sin(t * 22) * 2.2, 0, -0.6 + Math.sin(t * 17) * 0.5);
+  P.armR.rotation.set(Math.cos(t * 21) * 2.2, 0, 0.6 + Math.cos(t * 19) * 0.5);
+  P.legL.rotation.x = Math.sin(t * 18) * 1.1;
+  P.legR.rotation.x = Math.cos(t * 18) * 1.1;
+  P.kneeL.rotation.x = 0.6 + Math.sin(t * 14) * 0.5;
+  P.kneeR.rotation.x = 0.6 + Math.cos(t * 14) * 0.5;
+}
+
+// ---------------------------------------------------------------- entity types
+const TYPES = {
+  desk:       { pts: 150, label: 'DESK',          w: 0.7, fx: ['paper', 'wood'] },
+  monitor:    { pts: 100, label: 'MONITOR',       w: 1.0, fx: ['shard', 'spark'] },
+  laptop:     { pts: 120, label: 'LAPTOP',        w: 1.1, fx: ['shard', 'spark'] },
+  keyboard:   { pts: 30,  label: 'KEYBOARD',      w: 1.2, fx: ['shard'] },
+  mug:        { pts: 25,  label: 'MUG',           w: 1.2, fx: ['coffee'] },
+  papers:     { pts: 40,  label: 'TPS REPORTS',   w: 1.2, fx: ['paper', 'paper'] },
+  chair:      { pts: 60,  label: 'CHAIR',         w: 1.0, fx: [] },
+  person:     { pts: 500, label: '',              w: 0.9, fx: ['paper'] },
+  boss:       { pts: 2500, label: 'THE BOSS!',    w: 0.8, fx: ['paper', 'paper'] },
+  hr:         { pts: 1500, label: 'HR!',          w: 0.85, fx: ['paper', 'paper', 'paper'] },
+  plant:      { pts: 75,  label: 'PLANT',         w: 1.0, fx: ['leaf', 'dirt'] },
+  cooler:     { pts: 200, label: 'WATER COOLER',  w: 0.9, fx: ['water', 'water'] },
+  printer:    { pts: 350, label: 'THE PRINTER',   w: 0.6, fx: ['paper', 'paper', 'shard', 'spark'] },
+  cabinet:    { pts: 150, label: 'CABINET',       w: 0.6, fx: ['paper', 'paper'] },
+  cardboard:  { pts: 40,  label: 'BOX',           w: 1.1, fx: ['paper'] },
+  trash:      { pts: 30,  label: 'TRASH',         w: 1.2, fx: ['paper'] },
+  partition:  { pts: 80,  label: 'CUBICLE',       w: 0.8, fx: [] },
+  table:      { pts: 400, label: 'MEETING TABLE', w: 0.5, fx: ['wood', 'paper'] },
+  whiteboard: { pts: 150, label: 'WHITEBOARD',    w: 0.8, fx: [] },
+  sofa:       { pts: 250, label: 'SOFA',          w: 0.6, fx: [] },
+};
+
+const YELLS = ['HEY!', 'MY COFFEE!', 'AAAAH!', "I'm telling HR!", 'Is this about the stapler?', 'OW!',
+  'My spreadsheet!!', 'Not cool, man!', 'Per my last email—', 'Can we circle back?!', 'WHY ME?!',
+  "It's casual Friday!", 'I just got promoted!', 'Let\'s take this offline!', 'My lunch!'];
+const BOSS_YELLS = ["YOU'RE FIRED!", 'MY OFFICE. NOW!', 'THIS IS GOING IN YOUR REVIEW!', 'WHO APPROVED THIS?!'];
+const MILESTONES = [[10, 'RAMPAGE!'], [20, 'OUT OF OFFICE!'], [30, 'HR IS ON THE WAY!'], [45, 'TOTAL MELTDOWN!'],
+  [60, 'SYNERGY!!!'], [80, 'I QUIT!!!'], [100, 'LEGENDARY BURNOUT!']];
+
+const entities = [];
+function spawn(type, built, x, y, z, rotY = 0) {
+  const g = built.g;
+  let { hx, hz } = built;
+  if (Math.abs(Math.sin(rotY)) > 0.5) [hx, hz] = [hz, hx];
+  g.position.set(x, y, z);
+  g.rotation.y = rotY;
+  scene.add(g);
+  const e = {
+    type, def: TYPES[type], g, hx, hy: built.hy, hz,
+    r: built.r ?? Math.max(0.12, (built.hx + built.hy + built.hz) / 3),
+    state: 'static', vel: new V3(), ang: new V3(), supports: [], chain: 0, kicks: 0,
+    person: built.parts || null, walk: 0, dodger: false, seated: false, animT: Math.random() * 10,
+  };
+  entities.push(e);
+  return e;
+}
+const onTop = (base, child) => { base.supports.push(child); return child; };
+
+// ---------------------------------------------------------------- placement helpers
+function addPerson(x, z, rotY, o = {}) {
+  const boss = !!o.boss;
+  const built = boss
+    ? buildPerson({ shirt: 0x2b2f3a, pants: 0x2b2f3a, tie: 0xd4af37, hair: 0x9a9a9a, bald: chance(0.6), belly: true })
+    : buildPerson();
+  if (boss) built.g.scale.setScalar(1.12);
+  const y = o.seatY ?? CFG.hipH * (boss ? 1.12 : 1);
+  const e = spawn(boss ? 'boss' : 'person', built, x, y, z, rotY);
+  e.seated = !!o.seated;
+  e.dodger = !!o.dodger;
+  e.walk = o.walk || 0;
+  if (e.seated) poseSeated(e.person);
+  return e;
+}
+function addChair(x, z, rotY, seatedChance = 0) {
+  const b = buildChair();
+  const c = spawn('chair', b, x, b.hy, z, rotY);
+  if (chance(seatedChance)) {
+    const p = addPerson(x, z, rotY, { seated: true, seatY: b.seat + 0.06 });
+    onTop(c, p);
+  }
+  return c;
+}
+// facing = PI: the worker faces -Z (back to the player), chair on the +Z side
+function addWorkstation(x, z, facing, seatedChance = 0.45) {
+  const s = facing === 0 ? -1 : 1;
+  const d = spawn('desk', buildDesk(), x, 0.38, z);
+  const top = 0.76;
+  const monRot = facing === 0 ? PI : 0;
+  if (chance(0.92)) onTop(d, spawn('monitor', buildMonitor(), x + rand(-0.35, 0.35), top + 0.3, z - s * 0.2, monRot + rand(-0.2, 0.2)));
+  if (chance(0.25)) onTop(d, spawn('monitor', buildMonitor(), x + (chance(0.5) ? -0.7 : 0.7), top + 0.3, z - s * 0.2, monRot));
+  if (chance(0.8)) onTop(d, spawn('keyboard', buildKeyboard(), x + rand(-0.2, 0.2), top + 0.015, z + s * 0.22, monRot));
+  if (chance(0.55)) onTop(d, spawn('mug', buildMug(), x + rand(0.5, 0.9) * (chance(0.5) ? 1 : -1), top + 0.065, z + rand(-0.3, 0.3)));
+  if (chance(0.4)) onTop(d, spawn('papers', buildPapers(), x + rand(-0.9, -0.6), top + 0.08, z + rand(-0.2, 0.2)));
+  addChair(x + rand(-0.15, 0.15), z + s * 1.0, facing, seatedChance);
+  return d;
+}
+function addStack(x, z, n) {
+  let prev = null;
+  for (let i = 0; i < n; i++) {
+    const e = spawn('cardboard', buildCardboard(), x + rand(-0.05, 0.05), 0.225 + i * 0.45, z, rand(-0.25, 0.25));
+    if (prev) onTop(prev, e);
+    prev = e;
+  }
+}
+const simple = (type, builder, x, z, rotY = 0) => { const b = builder(); return spawn(type, b, x, b.hy, z, rotY); };
+
+// ---------------------------------------------------------------- level patterns
+function patDeskRows(zc) {
+  const rows = chance(0.55) ? [zc - 1.8, zc + 1.2] : [zc];
+  for (const rz of rows) {
+    let placed = 0;
+    for (const x of [-6.4, -2.1, 2.1, 6.4]) {
+      if (chance(0.72) || (placed === 0 && x > 6)) { addWorkstation(x, rz, PI); placed++; }
+    }
+  }
+}
+function patCubicles(zc) {
+  const sides = chance(0.7) ? [-1, 1] : [pick([-1, 1])];
+  for (const s of sides) {
+    const xc = s * 4.55;
+    for (const dx of [-1.15, 1.15]) {
+      simple('partition', buildPartition, xc + dx, zc);
+      addWorkstation(xc + dx, zc - 0.6, 0, 0.5);
+      addWorkstation(xc + dx, zc + 0.6, PI, 0.5);
+    }
+  }
+  if (sides.length === 1) {
+    const s = -sides[0];
+    simple('cooler', buildCooler, s * 6, zc - 1);
+    addPerson(s * 5.2, zc - 0.6, s > 0 ? PI / 2 : -PI / 2, { dodger: chance(0.5) });
+    simple('plant', buildPlant, s * 8.1, zc + 1.5);
+  }
+  if (chance(0.65)) addPerson(rand(-1.2, 1.2), zc + rand(-1, 1), rand(-PI, PI), { dodger: chance(0.6) });
+  else simple('plant', buildPlant, rand(-1, 1), zc);
+}
+function patLounge(zc) {
+  const cx = rand(-4.5, 4.5);
+  simple('cooler', buildCooler, cx + rand(-0.4, 0.4), zc - 1.7);
+  const n = 3 + ((Math.random() * 3) | 0), off = Math.random() * PI * 2;
+  for (let i = 0; i < n; i++) {
+    const a = off + (i / n) * PI * 2;
+    const px = cx + Math.cos(a) * 1.0, pz = zc + 0.5 + Math.sin(a) * 1.0;
+    addPerson(px, pz, Math.atan2(cx - px, zc + 0.5 - pz), { dodger: chance(0.5) });
+  }
+  const sx = cx > 0 ? -1 : 1;
+  if (chance(0.7)) simple('sofa', buildSofa, sx * rand(4, 6.5), zc + rand(-1.5, 1.5), chance(0.5) ? 0 : PI);
+  simple('plant', buildPlant, -8.2, zc + rand(-2, 2));
+  simple('plant', buildPlant, 8.2, zc + rand(-2, 2));
+  if (chance(0.6)) simple('trash', buildTrash, cx + rand(-2, 2), zc + 2.2);
+}
+function patMeeting(zc) {
+  const tx = rand(-2.8, 2.8);
+  const table = spawn('table', buildTable(), tx, 0.38, zc);
+  for (let i = 0; i < 4; i++) {
+    const pick2 = chance(0.5) ? buildLaptop : buildPapers;
+    const b = pick2();
+    const type = pick2 === buildLaptop ? 'laptop' : 'papers';
+    onTop(table, spawn(type, b, tx + rand(-1.9, 1.9), 0.76 + b.hy, zc + rand(-0.5, 0.5), rand(-PI, PI)));
+  }
+  if (chance(0.6)) onTop(table, spawn('mug', buildMug(), tx + rand(-1.5, 1.5), 0.76 + 0.065, zc + rand(-0.4, 0.4)));
+  for (const dx of [-1.5, 0, 1.5]) {
+    addChair(tx + dx, zc - 1.15, 0, 0.6);
+    addChair(tx + dx, zc + 1.15, PI, 0.6);
+  }
+  const wbLeft = tx - 3.3 > -8.2;
+  const wbx = wbLeft ? tx - 3.3 : tx + 3.3;
+  const wb = buildWhiteboard();
+  spawn('whiteboard', wb, wbx, wb.hy, zc, wbLeft ? PI / 2 : -PI / 2);
+  const hx = wbLeft ? wbx + 0.8 : wbx - 0.8;
+  addPerson(hx, zc + 0.3, wbLeft ? PI / 2 : -PI / 2, { boss: chance(0.4) });
+}
+function patCopy(zc) {
+  const s = pick([-1, 1]);
+  simple('printer', buildPrinter, s * 7.7, zc - 0.6, s > 0 ? -PI / 2 : PI / 2);
+  addPerson(s * 6.6, zc - 0.6, s > 0 ? PI / 2 : -PI / 2);
+  for (const dz of [1.1, 1.8, 2.5]) if (chance(0.85)) simple('cabinet', buildCabinet, s * 8.25, zc + dz, s > 0 ? -PI / 2 : PI / 2);
+  const stacks = 2 + ((Math.random() * 2) | 0);
+  for (let i = 0; i < stacks; i++) addStack(-s * rand(0.5, 7), zc + rand(-2.5, 2.5), 1 + ((Math.random() * 3) | 0));
+  for (let i = 0; i < 2; i++) simple('trash', buildTrash, rand(-6, 6), zc + rand(-2.8, 2.8));
+}
+function patScatter(zc) {
+  const used = [];
+  const free = (x, z, r) => used.every((u) => Math.hypot(u[0] - x, u[1] - z) > u[2] + r);
+  const n = 5 + ((Math.random() * 4) | 0);
+  for (let i = 0, tries = 0; i < n && tries < 40; tries++) {
+    const x = rand(-7.6, 7.6), z = zc + rand(-3, 3);
+    const kind = pick(['chair', 'chair', 'trash', 'plant', 'stack', 'cooler', 'person', 'person']);
+    const r = kind === 'person' ? 0.6 : 0.7;
+    if (!free(x, z, r)) continue;
+    used.push([x, z, r]); i++;
+    if (kind === 'chair') addChair(x, z, rand(-PI, PI));
+    else if (kind === 'trash') simple('trash', buildTrash, x, z);
+    else if (kind === 'plant') simple('plant', buildPlant, x, z);
+    else if (kind === 'stack') addStack(x, z, 1 + ((Math.random() * 3) | 0));
+    else if (kind === 'cooler') simple('cooler', buildCooler, x, z);
+    else addPerson(x, z, rand(-PI, PI), { dodger: chance(0.6) });
+  }
+}
+const PATTERNS = [[patDeskRows, 3], [patCubicles, 3], [patLounge, 2], [patMeeting, 2], [patCopy, 2], [patScatter, 2]];
+const PATTERN_TOTAL = PATTERNS.reduce((a, p) => a + p[1], 0);
+function pickPattern() {
+  let r = Math.random() * PATTERN_TOTAL;
+  for (const [f, w] of PATTERNS) { if ((r -= w) < 0) return f; }
+  return PATTERNS[0][0];
+}
+
+function genChunk(idx) {
+  const z0 = -idx * CFG.chunkLen;
+  chunks.push({ z0, env: buildEnv(z0) });
+  if (idx > 0) pickPattern()(z0 - 6);
+  pickPattern()(z0 - 18);
+  if (idx > 0) {
+    const nw = (Math.random() * 2.3) | 0;
+    for (let i = 0; i < nw; i++) {
+      addPerson(rand(-7, 7), z0 - 12 + rand(-1.2, 1.2), 0, { walk: rand(1.3, 2.4) * (chance(0.5) ? 1 : -1) });
+    }
+    if (chance(0.5)) spawnPickup(pickPickupKind(), rand(-6.5, 6.5), z0 - 23.6);
+  }
+}
+function ensureChunks() {
+  while (-nextChunk * CFG.chunkLen > player.z - CFG.viewAhead) genChunk(nextChunk++);
+  while (chunks.length && chunks[0].z0 - CFG.chunkLen > player.z + CFG.cleanupBehind) {
+    scene.remove(chunks.shift().env);
+  }
+}
+
+// ---------------------------------------------------------------- pickups
+// weapons: picked up off the floor, swung with a click / tap / Space, break after `uses` swings
+const WEAPONS = {
+  mouse:    { name: 'MOUSE FLAIL', icon: '🖱️', uses: 12, dur: 0.6, color: 0x4fc3ff, css: '#7fe0ff', text: '🖱️ MOUSE FLAIL! CLICK TO SWING' },
+  keyboard: { name: 'KEYBOARD', icon: '⌨️', uses: 8, dur: 0.38, color: 0xffb347, css: '#ffb347', text: '⌨️ KEYBOARD! CLICK TO SWING' },
+};
+const RING_GEO = new THREE.RingGeometry(0.55, 0.8, 32);
+RING_GEO.rotateX(-PI / 2);
+const pickups = [];
+function pickPickupKind() {
+  return chance(0.5) ? 'mouse' : 'keyboard';
+}
+// shared by the floor pickup and the first-person weapon
+function buildMouseModel(parent) {
+  bx(parent, 0.13, 0.07, 0.21, 0xe9e9ec);
+  bx(parent, 0.005, 0.072, 0.09, 0x777777, 0, 0.002, -0.055);
+  bx(parent, 0.025, 0.03, 0.04, 0x333333, 0, 0.045, -0.06);
+}
+function spawnPickup(kind, x, z) {
+  const g = new THREE.Group();
+  const item = new THREE.Group(); g.add(item);
+  if (kind === 'mouse') {
+    const m = new THREE.Group(); m.scale.setScalar(2.4); item.add(m);
+    buildMouseModel(m);
+    for (let i = 0; i < 5; i++) bx(item, 0.04, 0.04, 0.16, 0x222222, Math.sin(i * 1.3) * 0.08, -0.04 + i * 0.01, 0.3 + i * 0.14);
+  } else {
+    const k = buildKeyboard().g; k.scale.setScalar(1.5); k.rotation.x = 0.5; item.add(k);
+    for (let i = 0; i < 6; i++) bx(item, 0.08, 0.05, 0.08, 0xdddddd, -0.35 + i * 0.14, 0.04, 0.02);
+  }
+  const ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({
+    color: WEAPONS[kind].color, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  ring.position.y = -1.08;
+  g.add(ring);
+  g.position.set(x, 1.1, z);
+  scene.add(g);
+  pickups.push({ kind, g, item, ring, x, z });
+}
+
+// ---------------------------------------------------------------- particles
+const PAPER_GEO = new THREE.PlaneGeometry(0.22, 0.3);
+const PKINDS = {
+  paper:  { geo: PAPER_GEO, mat: new THREE.MeshLambertMaterial({ color: 0xfafafa, side: THREE.DoubleSide }), s: 1, grav: 0.16, drag: 2.0, life: 2.4, flutter: true },
+  leaf:   { geo: PAPER_GEO, mat: new THREE.MeshLambertMaterial({ color: 0x3f9a43, side: THREE.DoubleSide }), s: 0.55, grav: 0.3, drag: 1.6, life: 1.6, flutter: true },
+  shard:  { geo: BOX, mat: mat(0x1b1b1f), s: 0.09, grav: 1, drag: 0.3, life: 1.4 },
+  spark:  { geo: BOX, mat: glow(0xffd84a), s: 0.06, grav: 0.5, drag: 1.2, life: 0.5 },
+  water:  { geo: BOX, mat: glow(0x7cc8ff), s: 0.1, grav: 1, drag: 0.3, life: 0.9 },
+  coffee: { geo: BOX, mat: mat(0x5a3418), s: 0.07, grav: 1, drag: 0.3, life: 0.8 },
+  dirt:   { geo: BOX, mat: mat(0x5b3a1e), s: 0.08, grav: 1, drag: 0.3, life: 1.0 },
+  wood:   { geo: BOX, mat: mat(0xb88a52), s: 0.11, grav: 1, drag: 0.3, life: 1.2 },
+};
+const particles = [];
+const pfree = {};
+function emit(kind, pos, n, spd = 6) {
+  const k = PKINDS[kind];
+  const pool = (pfree[kind] ||= []);
+  for (let i = 0; i < n && particles.length < 450; i++) {
+    let m = pool.pop();
+    if (!m) { m = new THREE.Mesh(k.geo, k.mat); scene.add(m); }
+    m.visible = true;
+    m.scale.setScalar(k.s * rand(0.7, 1.3));
+    m.position.copy(pos);
+    m.rotation.set(rand(0, 6), rand(0, 6), rand(0, 6));
+    particles.push({
+      m, kind, k, life: k.life * rand(0.7, 1.2), seed: Math.random() * 10,
+      vel: new V3(rand(-1, 1) * spd, rand(0.5, 1.5) * spd, rand(-1, 0.6) * spd - CFG.runSpeed * 0.6),
+      spin: new V3(rand(-12, 12), rand(-12, 12), rand(-12, 12)),
+    });
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i], k = p.k, m = p.m;
+    p.life -= dt;
+    if (p.life <= 0) {
+      m.visible = false;
+      pfree[p.kind].push(m);
+      particles.splice(i, 1);
+      continue;
+    }
+    p.vel.y -= CFG.gravity * k.grav * dt;
+    p.vel.multiplyScalar(Math.max(0, 1 - k.drag * dt));
+    if (k.flutter) p.vel.x += Math.sin(time * 7 + p.seed) * dt * 4;
+    m.position.addScaledVector(p.vel, dt);
+    m.rotation.x += p.spin.x * dt; m.rotation.y += p.spin.y * dt; m.rotation.z += p.spin.z * dt;
+    if (m.position.y < 0.02) { m.position.y = 0.02; p.vel.set(0, 0, 0); p.spin.set(0, 0, 0); }
+  }
+}
+
+// ---------------------------------------------------------------- DOM fx
+const $ = (id) => document.getElementById(id);
+const fxLayer = $('fx'), bannerEl = $('banner');
+const pops = [];
+function popup(pos, text, cls = '', life = 0.9) {
+  const el = document.createElement('div');
+  el.className = 'pop ' + cls;
+  el.textContent = text;
+  fxLayer.appendChild(el);
+  pops.push({ el, pos: pos.clone(), life, max: life });
+}
+const projV = new V3();
+function updatePops(dt) {
+  const w = innerWidth, h = innerHeight;
+  for (let i = pops.length - 1; i >= 0; i--) {
+    const p = pops[i];
+    p.life -= dt;
+    if (p.life <= 0) { p.el.remove(); pops.splice(i, 1); continue; }
+    p.pos.y += dt * 1.6;
+    p.pos.z -= dt * CFG.runSpeed * (mode === 'playing' ? 1 : 0);
+    projV.copy(p.pos).project(camera);
+    if (projV.z > 1) { p.el.style.opacity = 0; continue; }
+    const k = 1 - p.life / p.max;
+    const sc = k < 0.15 ? 0.6 + (k / 0.15) * 0.6 : 1.2 - Math.min(0.2, (k - 0.15));
+    p.el.style.opacity = Math.min(1, p.life / (p.max * 0.35));
+    p.el.style.transform = `translate(${(projV.x * 0.5 + 0.5) * w}px,${(-projV.y * 0.5 + 0.5) * h}px) translate(-50%,-50%) scale(${sc})`;
+  }
+}
+function banner(text, color = '#ffde3b') {
+  bannerEl.textContent = text;
+  bannerEl.style.color = color;
+  bannerEl.classList.remove('show');
+  void bannerEl.offsetWidth;
+  bannerEl.classList.add('show');
+}
+
+// ---------------------------------------------------------------- player
+const playerBuilt = buildPerson({ shirt: 0xffffff, pants: 0x23262f, tie: 0xc81d25, skin: 0xf2a07b, hair: 0x151515, angry: true });
+const player = { x: 0, z: 0, vx: 0, phase: 0, scale: 1, g: playerBuilt.g, P: playerBuilt.parts };
+player.g.rotation.y = PI;
+player.g.visible = false; // first person: the body stays hidden, only the arms are drawn
+
+// first-person arms live in their own scene, rendered over the world so they never clip into desks
+const armScene = new THREE.Scene();
+armScene.add(new THREE.HemisphereLight(0xffffff, 0x8a90a0, 1.6));
+const armLight = new THREE.DirectionalLight(0xfff6e8, 1.3);
+armLight.position.set(1, 2, 1);
+armScene.add(armLight);
+const armCam = new THREE.PerspectiveCamera(60, 1, 0.01, 10);
+function buildFpArm(s) {
+  const pivot = new THREE.Group();
+  pivot.position.set(s * 0.42, -0.55, -0.15);
+  bx(pivot, 0.17, 0.17, 0.62, 0xffffff, 0, 0, -0.31);
+  bx(pivot, 0.185, 0.185, 0.08, 0xe6e6e6, 0, 0, -0.6);
+  bx(pivot, 0.16, 0.15, 0.17, 0xf2a07b, 0, 0, -0.72);
+  bx(pivot, 0.17, 0.05, 0.05, 0xd98a68, 0, 0.06, -0.8); // knuckles
+  armScene.add(pivot);
+  return { pivot, s, punch: 0 };
+}
+const fpArms = [buildFpArm(-1), buildFpArm(1)];
+let nextPunch = 0;
+function punch() {
+  if (weapon) nextPunch = 0; // the right hand is busy holding the weapon
+  const a = fpArms[nextPunch];
+  if (a.punch <= 0.05) { a.punch = 0.18; if (!weapon) nextPunch ^= 1; }
+}
+
+// first-person keyboard: held by its short end like a club, keycaps pop off with each swing
+const fpKeyboard = new THREE.Group();
+fpKeyboard.position.set(0, 0.02, -0.76);
+fpArms[1].pivot.add(fpKeyboard);
+bx(fpKeyboard, 0.32, 0.05, 1.0, 0x2a2a2e, 0, 0, -0.45);
+const fpKeycaps = [];
+for (let row = 0; row < 13; row++) {
+  for (let col = 0; col < 4; col++) {
+    fpKeycaps.push(bx(fpKeyboard, 0.058, 0.035, 0.058, row === 6 && col > 0 ? 0xe63946 : 0xeeeeee, -0.105 + col * 0.07, 0.04, -0.06 - row * 0.07));
+  }
+}
+fpKeyboard.visible = false;
+
+// first-person mouse flail: the mouse whirls on its cord, drawn as a chain of thin segments
+const fpMouse = new THREE.Group();
+armScene.add(fpMouse);
+const fpMouseBody = new THREE.Group();
+fpMouseBody.scale.setScalar(1.1);
+buildMouseModel(fpMouseBody);
+fpMouse.add(fpMouseBody);
+const cordSegs = [];
+for (let i = 0; i < 10; i++) {
+  const s = new THREE.Mesh(BOX, mat(0x1e1e22));
+  fpMouse.add(s);
+  cordSegs.push(s);
+}
+fpMouse.visible = false;
+const handPos = new V3(), mousePos = new V3(), cordMid = new V3(), cordA = new V3(), cordB = new V3();
+// idle pendulum, simulated in view space (verlet): the cord end is pinned to the moving fist
+const CORD_LEN = 0.34;
+const mouseSim = { p: new V3(), prev: new V3(), live: false, lastVx: 0 };
+const viewGrav = new V3(), invCam = new THREE.Quaternion();
+function simulateHangingMouse(dt) {
+  const s = mouseSim;
+  if (!s.live) {
+    // first frame (or right after a whirl): start wherever the cord end currently is
+    if (!mousePos.lengthSq()) mousePos.copy(handPos).add(cordA.set(0, -CORD_LEN, 0));
+    s.p.copy(mousePos); s.prev.copy(mousePos); s.live = true;
+  }
+  dt = Math.max(dt, 1e-4);
+  // world "down" as seen from the (pitched, rolling, bobbing) camera
+  invCam.copy(camera.quaternion).invert();
+  viewGrav.set(0, -9.8, 0).applyQuaternion(invCam);
+  // swerving: the mouse lags behind the hand
+  const ax = (player.vx - s.lastVx) / dt;
+  s.lastVx = player.vx;
+  viewGrav.x -= ax * 0.6;
+  // running into the air pushes it back towards you a little
+  if (mode === 'playing') viewGrav.z += 1.6;
+  cordB.copy(s.p).sub(s.prev).multiplyScalar(0.985); // velocity with a bit of damping
+  s.prev.copy(s.p);
+  s.p.add(cordB).addScaledVector(viewGrav, dt * dt);
+  // keep the cord taut: the mouse can't be further than CORD_LEN from the fist
+  cordA.subVectors(s.p, handPos);
+  s.p.copy(handPos).addScaledVector(cordA.normalize(), CORD_LEN);
+  mousePos.copy(s.p);
+}
+function updateFpMouse(swingK, dt) {
+  const pv = fpArms[1].pivot;
+  pv.updateMatrixWorld(true);
+  handPos.set(0, -0.04, -0.82); // bottom of the fist, where the cord comes out
+  pv.localToWorld(handPos);
+  if (swingK !== null) {
+    // two full turns around the player, slightly tilted
+    const a = -PI / 2 + swingK * PI * 4;
+    const R = 1.05 * Math.sin(Math.min(1, swingK * 6) * PI / 2);
+    mousePos.set(handPos.x + Math.cos(a) * R, handPos.y + 0.3 + Math.sin(a) * 0.3, handPos.z - 0.95 + Math.sin(a) * R);
+    mouseSim.live = false; // when the whirl ends, the pendulum takes over from here and swings back down
+  } else {
+    simulateHangingMouse(dt);
+  }
+  // mousePos is where the cord ends; the mouse hangs from it by its front (button) end
+  cordA.subVectors(mousePos, handPos).normalize();
+  fpMouseBody.position.copy(mousePos).addScaledVector(cordA, 0.125);
+  fpMouseBody.lookAt(handPos);
+  fpMouseBody.rotateY(PI);
+  // cord: straight while hanging taut, bowed slightly while whirling
+  cordMid.lerpVectors(handPos, mousePos, 0.5);
+  if (swingK !== null) cordMid.y += 0.06;
+  const N = cordSegs.length;
+  const pointAt = (t, out) => out.set(
+    (1 - t) * (1 - t) * handPos.x + 2 * (1 - t) * t * cordMid.x + t * t * mousePos.x,
+    (1 - t) * (1 - t) * handPos.y + 2 * (1 - t) * t * cordMid.y + t * t * mousePos.y,
+    (1 - t) * (1 - t) * handPos.z + 2 * (1 - t) * t * cordMid.z + t * t * mousePos.z);
+  for (let i = 0; i < N; i++) {
+    pointAt(i / N, cordA);
+    pointAt((i + 1) / N, cordB);
+    const s = cordSegs[i];
+    s.position.lerpVectors(cordA, cordB, 0.5);
+    s.scale.set(0.018, 0.018, cordA.distanceTo(cordB) + 0.004);
+    s.lookAt(cordB);
+  }
+}
+
+function animatePlayer(dt) {
+  const P = player.P;
+  if (mode === 'playing') {
+    player.phase += dt * CFG.runSpeed * 0.75;
+    const s = Math.sin(player.phase);
+    P.legL.rotation.x = s * 1.0; P.legR.rotation.x = -s * 1.0;
+    P.kneeL.rotation.x = 0.25 + Math.max(0, -s) * 1.5;
+    P.kneeR.rotation.x = 0.25 + Math.max(0, s) * 1.5;
+    // arms flailing overhead in rage
+    P.armL.rotation.set(-2.5 + Math.sin(player.phase * 1.3) * 0.55, 0, -0.35);
+    P.armR.rotation.set(-2.5 + Math.cos(player.phase * 1.3) * 0.55, 0, 0.35);
+    P.head.rotation.set(Math.sin(player.phase * 2) * 0.08, 0, Math.sin(player.phase * 0.9) * 0.12);
+    player.g.position.y = CFG.hipH * player.scale + Math.abs(Math.cos(player.phase)) * 0.12;
+    player.g.rotation.x = -0.18;
+  } else {
+    // fuming on the spot
+    poseReset(P);
+    player.phase += dt * 6;
+    P.armL.rotation.set(-0.2, 0, -0.25 - Math.abs(Math.sin(player.phase * 3)) * 0.2);
+    P.armR.rotation.set(-0.2, 0, 0.25 + Math.abs(Math.sin(player.phase * 3)) * 0.2);
+    player.g.position.y = CFG.hipH * player.scale + Math.abs(Math.sin(player.phase * 4)) * 0.03;
+    player.g.rotation.x = 0;
+  }
+  player.g.position.x = player.x;
+  player.g.position.z = player.z;
+  player.g.rotation.z = -player.vx * 0.025;
+  player.g.rotation.y = PI - player.vx * 0.03;
+  const swingK = weapon && weapon.swingT > 0 ? 1 - weapon.swingT / WEAPONS[weapon.kind].dur : null;
+  for (const a of fpArms) {
+    const pv = a.pivot;
+    a.punch = Math.max(0, a.punch - dt);
+    if (weapon && a.s > 0 && mode !== 'duel') { // during a duel the weapon arm drops so you can see the foe
+      const bobY = mode === 'playing' ? Math.abs(Math.cos(player.phase)) * 0.04 : 0;
+      if (weapon.kind === 'keyboard') {
+        if (swingK !== null) {
+          // wind up on the right, then sweep hard across to the left
+          const e = swingK < 0.15 ? 0 : Math.min(1, (swingK - 0.15) / 0.55);
+          const ease = e * e * (3 - 2 * e);
+          pv.position.set(0.48 - ease * 0.55, -0.42 + Math.sin(ease * PI) * 0.12, -0.25 - Math.sin(ease * PI) * 0.15);
+          pv.rotation.set(0.25 + Math.sin(ease * PI) * 0.1, -1.4 + ease * 2.7, 1.3 - ease * 0.4);
+        } else {
+          // resting on the shoulder, ready to swing
+          pv.position.set(0.4, -0.52 + bobY, -0.2);
+          pv.rotation.set(0.75, 0.2, 0.55);
+        }
+      } else {
+        if (swingK !== null) {
+          const a2 = swingK * PI * 4;
+          pv.position.set(0.2 + Math.cos(a2) * 0.05, -0.36 + Math.sin(a2) * 0.04, -0.2);
+          pv.rotation.set(1.0, 0.2, 0.2);
+        } else {
+          // arm raised, the mouse dangling from its cord in front of you
+          pv.position.set(0.24, -0.4 + bobY, -0.2);
+          pv.rotation.set(0.85, 0.25, 0.2);
+        }
+      }
+    } else if (mode === 'playing') {
+      const ph = player.phase + (a.s > 0 ? PI : 0);
+      const thrust = a.punch > 0 ? Math.sin((a.punch / 0.18) * PI) : 0;
+      pv.position.set(a.s * (0.4 - thrust * 0.12), -0.5 + Math.abs(Math.cos(ph)) * 0.05 + thrust * 0.12, -0.12 + Math.sin(ph) * 0.1 - thrust * 0.4);
+      pv.rotation.set(0.3 + Math.sin(ph) * 0.3 - thrust * 0.25, a.s * 0.18 * (1 - thrust), a.s * 0.2);
+    } else {
+      // shaking fists, fuming
+      pv.position.set(a.s * 0.45, -0.68 + Math.abs(Math.sin(player.phase * 3 + a.s)) * 0.05, -0.2);
+      pv.rotation.set(0.15, a.s * 0.25, a.s * 0.3 + Math.sin(player.phase * 9) * 0.05);
+    }
+    pv.scale.setScalar(0.72 * player.scale);
+  }
+  if (fpMouse.visible) updateFpMouse(swingK, dt);
+}
+
+// ---------------------------------------------------------------- game state
+let mode = 'menu';
+let score = 0, timeLeft = CFG.gameTime, combo = 0, comboT = 0, maxCombo = 0;
+let shake = 0, time = 0, warned = false, camPitch = -0.16;
+const stats = { items: 0, people: 0 };
+let best = 0;
+try { best = parseInt(localStorage.getItem('officeRageBest') || '0', 10) || 0; } catch (e) { /* storage unavailable */ }
+const comboMult = () => Math.min(10, 1 + Math.floor(combo / 5));
+
+// things get smashed right at the camera, so float their popups a few metres ahead instead
+function popPos(src) {
+  const p = src.clone();
+  p.z = Math.min(p.z, player.z - 3);
+  p.y = Math.max(p.y, 1.3);
+  return p;
+}
+
+function award(e, debris) {
+  const p = popPos(e.g.position);
+  if (debris) {
+    const pts = 10;
+    score += pts;
+    popup(p, '+' + pts, 'small', 0.6);
+    return;
+  }
+  combo++;
+  comboT = CFG.comboWindow;
+  if (combo > maxCombo) maxCombo = combo;
+  const pts = e.def.pts * comboMult();
+  score += pts;
+  if (e.person) stats.people++; else stats.items++;
+  const big = e.def.pts >= 300;
+  popup(p, `+${pts}${big && e.def.label ? ' ' + e.def.label : ''}`, big ? 'big' : '', big ? 1.2 : 0.9);
+  if (e.person) popup(p.clone().add(new V3(0, 1.3, 0)), e.type === 'boss' ? pick(BOSS_YELLS) : pick(YELLS), 'yell', 1.4);
+  shake = Math.min(1, shake + (e.def.w < 0.8 ? 0.45 : 0.2));
+  const ms = MILESTONES.find((m) => m[0] === combo);
+  if (ms) banner(ms[1]);
+}
+
+function smash(e, srcX, inherit, power = 1) {
+  if (e.state === 'flying') return;
+  const debris = e.state === 'debris';
+  award(e, debris);
+  e.kicks++;
+  const w = e.def.w, p = e.g.position;
+  const side = Math.sign(p.x - srcX) || (chance(0.5) ? 1 : -1);
+  if (inherit) {
+    e.vel.set(inherit.x * 0.6 + side * rand(1, 3), Math.max(3, Math.abs(inherit.y) * 0.4) + rand(2, 5) * w, inherit.z * 0.6 - rand(0, 3));
+  } else {
+    const pow = (debris ? 0.75 : 1) * power;
+    e.vel.set(side * rand(2, 6) * w + player.vx * 0.35, rand(6, 11) * w * pow, -(CFG.runSpeed + rand(2, 9) * w) * pow);
+  }
+  e.ang.set(rand(-9, 9), rand(-9, 9), rand(-9, 9)).multiplyScalar(w);
+  e.state = 'flying';
+  e.walk = 0;
+  for (const f of e.def.fx) emit(f, p, f === 'paper' ? 10 : 8);
+  for (const s of e.supports) if (s.state === 'static') { s.chained = true; smash(s, srcX, null); }
+  e.supports.length = 0;
+}
+
+// ---------------------------------------------------------------- weapons
+let weapon = null;     // { kind, uses, swingT, hit: Set }
+let fist = null;       // bare-handed punch: { t, hit }
+let fistCooldown = 0;
+
+function equip(kind) {
+  weapon = { kind, uses: WEAPONS[kind].uses, swingT: 0, hit: new Set() };
+  fpMouse.visible = kind === 'mouse';
+  mouseSim.live = false;
+  fpKeyboard.visible = kind === 'keyboard';
+  for (const c of fpKeycaps) c.visible = true;
+}
+function unequip() {
+  weapon = null;
+  fpMouse.visible = fpKeyboard.visible = false;
+}
+
+function swing() {
+  if (mode !== 'playing') return;
+  if (weapon) {
+    if (weapon.swingT > 0 || weapon.uses <= 0) return;
+    weapon.swingT = WEAPONS[weapon.kind].dur;
+    weapon.hit = new Set();
+    weapon.uses--;
+    if (weapon.kind === 'keyboard') launchKeycaps();
+  } else if (fistCooldown <= 0) {
+    fistCooldown = 0.28;
+    fist = { t: 0.18, hit: new Set() };
+    punch();
+  }
+}
+
+// does entity e overlap the box [x0,x1] × [z0,z1]?
+const inBox = (e, x0, x1, z0, z1) => {
+  const p = e.g.position;
+  return p.x + e.hx > x0 && p.x - e.hx < x1 && p.z + e.hz > z0 && p.z - e.hz < z1;
+};
+
+function swingHits(test, hitSet, srcXFor, power) {
+  for (const e of entities) {
+    if (e.state === 'flying' || e.duelist || hitSet.has(e) || !test(e)) continue;
+    hitSet.add(e);
+    smash(e, srcXFor(e), null, power);
+  }
+}
+
+function updateSwing(dt) {
+  const px = player.x, pz = player.z;
+  fistCooldown -= dt;
+  if (fist) {
+    fist.t -= dt;
+    swingHits((e) => inBox(e, px - 0.9, px + 0.9, pz - 1.9, pz), fist.hit, () => px, 1.05);
+    if (fist.t <= 0) fist = null;
+  }
+  if (!weapon || weapon.swingT <= 0) return;
+  const def = WEAPONS[weapon.kind];
+  const k = 1 - weapon.swingT / def.dur;
+  weapon.swingT -= dt;
+  if (weapon.kind === 'mouse') {
+    // the flail whirls all the way round: anything within the cord's reach gets clobbered, tossed outward
+    if (k > 0.05) {
+      swingHits((e) => {
+        const p = e.g.position;
+        const cx = clamp(px, p.x - e.hx, p.x + e.hx), cz = clamp(pz - 0.6, p.z - e.hz, p.z + e.hz);
+        return Math.hypot(cx - px, cz - (pz - 0.6)) < 3.4 && p.z < pz + 0.8;
+      }, weapon.hit, () => px, 1.35);
+    }
+  } else if (k > 0.15 && k < 0.85) {
+    // the keyboard sweeps right-to-left in front: things get batted to the left
+    swingHits((e) => inBox(e, px - 2.7, px + 2.7, pz - 3.2, pz + 0.4), weapon.hit, (e) => e.g.position.x + 1, 1.3);
+  }
+  if (weapon.swingT <= 0 && weapon.uses <= 0) {
+    banner(weapon.kind === 'mouse' ? 'CORD SNAPPED!' : 'KEYBOARD DESTROYED!', '#ff4b4b');
+    emit('shard', new V3(px, 1.4, pz - 1.2), 14, 5);
+    unequip();
+  }
+}
+
+// keycaps fly out of the keyboard on every swing and smash whatever they hit
+const keycaps = [];
+const KEYCAP_COLORS = [0xf2f2f2, 0xdcdcdc, 0xf2f2f2, 0x3a3a3f, 0xe63946];
+function launchKeycaps() {
+  const visible = fpKeycaps.filter((c) => c.visible);
+  const n = Math.min(visible.length, 6);
+  for (let i = 0; i < n; i++) {
+    visible.splice((Math.random() * visible.length) | 0, 1)[0].visible = false;
+    const m = new THREE.Mesh(BOX, mat(pick(KEYCAP_COLORS)));
+    m.scale.set(0.16, 0.09, 0.16);
+    m.castShadow = true;
+    m.position.set(player.x + rand(-0.6, 0.9), 1.3 + rand(-0.2, 0.3), player.z - 0.8);
+    scene.add(m);
+    keycaps.push({
+      m, life: 2, used: false,
+      vel: new V3(rand(-7, 5), rand(1, 5), -(CFG.runSpeed + rand(10, 20))),
+      spin: new V3(rand(-20, 20), rand(-20, 20), rand(-20, 20)),
+    });
+  }
+}
+function updateKeycaps(dt) {
+  for (let i = keycaps.length - 1; i >= 0; i--) {
+    const k = keycaps[i], p = k.m.position;
+    k.life -= dt;
+    if (k.life <= 0) { scene.remove(k.m); keycaps.splice(i, 1); continue; }
+    k.vel.y -= CFG.gravity * 0.6 * dt;
+    p.addScaledVector(k.vel, dt);
+    k.m.rotation.x += k.spin.x * dt; k.m.rotation.y += k.spin.y * dt; k.m.rotation.z += k.spin.z * dt;
+    if (p.y < 0.05) { p.y = 0.05; k.vel.y *= -0.4; k.vel.x *= 0.6; k.vel.z *= 0.6; k.spin.multiplyScalar(0.5); }
+    if (k.used || mode !== 'playing') continue;
+    for (const e of entities) {
+      if (e.state !== 'static' || e.duelist) continue;
+      const op = e.g.position;
+      if (Math.abs(op.x - p.x) > e.hx + 0.15 || Math.abs(op.z - p.z) > e.hz + 0.15) continue;
+      if (p.y > op.y + e.hy + 0.15) continue;
+      k.used = true;
+      k.vel.multiplyScalar(-0.2);
+      emit('spark', p, 6, 4);
+      smash(e, p.x, null, 0.9);
+      break;
+    }
+  }
+}
+
+function personBehave(e, dt) {
+  const P = e.person, p = e.g.position;
+  e.animT += dt;
+  if (e.seated) {
+    // oblivious, typing away
+    P.armL.rotation.x = -1.25 + Math.sin(e.animT * 16) * 0.08;
+    P.armR.rotation.x = -1.25 + Math.cos(e.animT * 16) * 0.08;
+    return;
+  }
+  let scared = false;
+  if (mode === 'playing') {
+    const dz = p.z - player.z;
+    scared = dz < 0 && dz > -11 && Math.abs(p.x - player.x) < 3.4;
+  }
+  if (e.walk) {
+    const spd = e.walk * (scared ? 2.2 : 1);
+    p.x += spd * dt;
+    if (Math.abs(p.x) > CFG.floorHalf - 0.8) { e.walk = -e.walk; p.x = clamp(p.x, -CFG.floorHalf + 0.8, CFG.floorHalf - 0.8); }
+    e.g.rotation.y = e.walk > 0 ? PI / 2 : -PI / 2;
+    poseWalk(P, e.animT * 7 * (scared ? 2 : 1));
+    if (scared) poseScared(P, e.animT);
+    return;
+  }
+  if (scared) {
+    if (e.dodger) {
+      const dir = Math.sign(p.x - player.x) || 1;
+      p.x = clamp(p.x + dir * 3.2 * dt, -CFG.floorHalf + 0.8, CFG.floorHalf - 0.8);
+      poseWalk(P, e.animT * 16, 0.5);
+    }
+    poseScared(P, e.animT);
+    e.g.rotation.y += (0 - e.g.rotation.y) * Math.min(1, dt * 6); // turn toward the player
+  } else {
+    P.armL.rotation.set(Math.sin(e.animT * 2) * 0.05, 0, -0.08);
+    P.armR.rotation.set(-Math.sin(e.animT * 2) * 0.05, 0, 0.08);
+  }
+}
+
+function updateEntities(dt) {
+  const pr = 0.6;
+  const px = player.x, pz = player.z;
+  for (let i = entities.length - 1; i >= 0; i--) {
+    const e = entities[i];
+    if (!e) continue;
+    const p = e.g.position;
+    if (p.z > pz + CFG.cleanupBehind) {
+      scene.remove(e.g);
+      entities.splice(i, 1);
+      continue;
+    }
+    if (e.state === 'flying') {
+      e.vel.y -= CFG.gravity * dt;
+      p.addScaledVector(e.vel, dt);
+      e.g.rotation.x += e.ang.x * dt;
+      e.g.rotation.y += e.ang.y * dt;
+      e.g.rotation.z += e.ang.z * dt;
+      if (e.person) poseFlail(e.person, time + e.animT);
+      const r = e.r;
+      if (p.y < r) {
+        p.y = r;
+        if (e.vel.y < 0) {
+          e.vel.y *= -0.35;
+          e.vel.x *= 0.7; e.vel.z *= 0.7;
+          e.ang.multiplyScalar(0.6);
+        }
+        e.vel.x *= Math.max(0, 1 - 3 * dt);
+        e.vel.z *= Math.max(0, 1 - 3 * dt);
+        if (Math.abs(e.vel.y) < 1.2 && Math.hypot(e.vel.x, e.vel.z) < 1.5) {
+          e.state = 'debris';
+          e.vel.set(0, 0, 0);
+          e.ang.set(0, 0, 0);
+        }
+      }
+      const lim = CFG.floorHalf - r;
+      if (Math.abs(p.x) > lim) { p.x = Math.sign(p.x) * lim; e.vel.x *= -0.5; }
+      // chain reactions: flying junk smashes whatever it hits
+      // only things the player hit directly can knock over (at most two) others
+      if (!e.chained && e.chain < 2 && e.vel.lengthSq() > 64) {
+        for (const o of entities) {
+          if (o.state !== 'static' || o === e || o.duelist) continue;
+          const op = o.g.position;
+          if (Math.abs(op.z - p.z) > o.hz + r || Math.abs(op.x - p.x) > o.hx + r) continue;
+          if (p.y - r > op.y + o.hy) continue;
+          o.chained = true;
+          e.chain++;
+          smash(o, p.x, e.vel);
+          e.vel.multiplyScalar(0.7);
+          break;
+        }
+      }
+      continue;
+    }
+    if (e.duelist) { foeBehave(e, dt); continue; }
+    if (e.person && e.state === 'static') personBehave(e, dt);
+    if (mode !== 'playing') continue;
+    if (Math.abs(p.z - pz) > e.hz + pr + 0.2 || Math.abs(p.x - px) > e.hx + pr + 0.2) continue;
+    const cx = clamp(px, p.x - e.hx, p.x + e.hx), cz = clamp(pz, p.z - e.hz, p.z + e.hz);
+    const dx = px - cx, dz = pz - cz;
+    if (dx * dx + dz * dz < pr * pr) { punch(); smash(e, px, null); }
+  }
+}
+
+function updatePickups(dt) {
+  const reach = 1.1;
+  for (let i = pickups.length - 1; i >= 0; i--) {
+    const pk = pickups[i];
+    pk.item.rotation.y += dt * 2.5;
+    pk.g.position.y = 1.1 + Math.sin(time * 3 + pk.x) * 0.15;
+    pk.ring.position.y = -pk.g.position.y + 0.03;
+    const ring = 1 + Math.sin(time * 6) * 0.1;
+    pk.ring.scale.set(ring, 1, ring);
+    if (pk.z > player.z + CFG.cleanupBehind) { scene.remove(pk.g); pickups.splice(i, 1); continue; }
+    if (mode === 'playing' && Math.hypot(pk.x - player.x, pk.z - player.z) < reach) {
+      const def = WEAPONS[pk.kind];
+      equip(pk.kind);
+      banner(def.text, def.css);
+      popup(popPos(pk.g.position), def.text, 'power', 1.1);
+      emit('spark', pk.g.position, 16, 5);
+      scene.remove(pk.g);
+      pickups.splice(i, 1);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- typing duels (HR / the boss)
+// After every 30 s of play a foe steps into your path and the run freezes: type the insult before the
+// clock runs out for +30 s. With a 90 s run that's two duels, and each win buys time for another.
+const DUEL = { every: 30, approach: 1.3, reward: 30, introT: 1.5, resultT: 1.8, gap: 3.4 };
+const FOES = {
+  hr: {
+    names: ['BRENDA FROM HR', 'KAREN, HR BUSINESS PARTNER', 'DOUG FROM PEOPLE & CULTURE'],
+    intro: ['We need to talk about your attitude.', 'This is your third verbal warning today.',
+      'I am going to need you to sign this form.', 'Let us schedule a quick sync about... this.'],
+    win: 'I... I need to file a complaint about myself.',
+    lose: 'Noted. In your file.',
+  },
+  boss: {
+    names: ['GARY PEMBERTON, REGIONAL VP', 'THE CEO (HE WEARS A VEST)', 'MR. HENDRICKS, YOUR BOSS'],
+    intro: ['My office. Now.', 'I am going to need you to come in on Saturday.',
+      'Do you have a minute? You do now.', 'Is this about the stapler again?'],
+    win: 'I will... get my coat.',
+    lose: 'That is going in your performance review.',
+  },
+};
+// one tier per round, longer each time (plain ASCII only, so phone keyboards can type them)
+const INSULTS = {
+  hr: [
+    ['Your lanyard is ugly', 'Pizza is not a raise', 'Fill out THIS form', 'Free fruit is a bribe'],
+    ['Your open door policy is a lie', 'Mandatory fun is still mandatory', 'Nobody reads the employee handbook',
+      'Your trust fall dropped me twice'],
+    ['Your wellness webinar made me physically ill', 'Please accept this as my two seconds notice',
+      'Our core values are printed on a mousepad'],
+    ['Per my last email, which you clearly never read, I am done with all of this',
+      'Your team building retreat was technically a hostage situation',
+      'I rate my employee experience one star, and that star is on fire'],
+  ],
+  boss: [
+    ['Your tie is a cry for help', 'Synergize THIS', 'This could have been an email', 'New phone, who dis'],
+    ['Your slides have too many transitions', 'This meeting should have been an email',
+      'Reply all is not a personality', 'Your vision board is just a yacht'],
+    ['I have been doing your job for six years for free', 'Your quarterly projections are a work of fiction',
+      'Nobody laughs at your jokes, we are just scared'],
+    ['Let us take this offline, and by offline I mean out the window',
+      'Your leadership style is a group chat nobody asked to join',
+      'I prepared a forty slide deck on why you are the bottleneck'],
+  ],
+};
+// difficulty per round: required typing speed (chars/s) and the time a typo costs
+const duelCps = (n) => Math.min(6, 2.6 + 0.7 * n);
+const duelTypoCost = (n) => 0.3 * n;
+
+let playT = 0, nextDuel = DUEL.every, duelCount = 0, duelsWon = 0;
+let duel = null;      // the duel in progress
+let foeIncoming = null; // the foe walking into your path just before a duel
+const duelEl = {
+  root: $('duel'), round: $('duelRound'), name: $('duelName'), says: $('duelSays'), prompt: $('duelPrompt'),
+  phrase: $('duelPhrase'), input: $('duelInput'), fill: $('duelFill'), time: $('duelTime'), panel: $('duelPanel'),
+};
+const foeKind = (n) => (n % 2 ? 'boss' : 'hr');
+
+function buildHR() {
+  const b = buildPerson({ shirt: 0x8d9099, pants: 0x4a4d55, skin: pick(SKINS), hair: pick(HAIRS) });
+  // clipboard in hand, ID badge on a lanyard
+  const clip = new THREE.Group();
+  clip.position.set(0, -0.52, 0.12);
+  clip.rotation.x = -0.4;
+  b.parts.armR.add(clip);
+  bx(clip, 0.26, 0.34, 0.02, 0x8b5a2b);
+  bx(clip, 0.22, 0.28, 0.01, 0xffffff, 0, -0.01, 0.015);
+  bx(clip, 0.1, 0.035, 0.035, 0xb0b0b0, 0, 0.16, 0.015);
+  bx(b.g, 0.02, 0.3, 0.01, 0x1e88e5, -0.08, 0.45, 0.145).rotation.z = -0.3;
+  bx(b.g, 0.02, 0.3, 0.01, 0x1e88e5, 0.08, 0.45, 0.145).rotation.z = 0.3;
+  bx(b.g, 0.1, 0.13, 0.015, 0xffffff, 0, 0.27, 0.15);
+  return b;
+}
+
+function spawnFoe() {
+  const kind = foeKind(duelCount);
+  const z = player.z - (CFG.runSpeed * DUEL.approach + DUEL.gap);
+  const e = kind === 'boss'
+    ? addPerson(player.x, z, 0, { boss: true })
+    : spawn('hr', buildHR(), player.x, CFG.hipH, z, 0);
+  e.duelist = true; // untouchable until the duel is decided
+  e.foeKind = kind;
+  foeIncoming = e;
+  banner(kind === 'boss' ? '⚠ THE BOSS APPROACHES' : '⚠ HR INCOMING', '#ff9f43');
+}
+
+function foeBehave(e, dt) {
+  const P = e.person, p = e.g.position;
+  e.animT += dt;
+  if (e.leaving) { // lost the duel: they stroll off smugly
+    p.x += e.leaving * 3.5 * dt;
+    e.g.rotation.y = e.leaving > 0 ? PI / 2 : -PI / 2;
+    poseWalk(P, e.animT * 8);
+    return;
+  }
+  if (mode === 'playing') p.x += (player.x - p.x) * Math.min(1, dt * 3); // steps into your path
+  e.g.rotation.y = 0;
+  const nervous = duel && duel.foe === e ? duel.typed / duel.phrase.length : 0;
+  e.g.rotation.x = -nervous * 0.3; // leans back as your insult lands
+  if (e.foeKind === 'boss') {
+    P.armR.rotation.set(-1.5 + Math.sin(e.animT * 7) * 0.12, 0, 0.1); // finger-wagging
+    P.armL.rotation.set(-0.2, 0, -0.5);
+  } else {
+    P.armR.rotation.set(-1.15, 0, 0.25);                               // clipboard up
+    P.armL.rotation.set(-1.0 + Math.sin(e.animT * 14) * 0.06, 0, -0.35); // scribbling notes
+  }
+  P.head.rotation.set(0, Math.sin(e.animT * 2) * 0.08 + Math.sin(e.animT * 30) * 0.05 * nervous, 0);
+}
+
+function startDuel() {
+  if (!foeIncoming) spawnFoe();
+  const n = duelCount++;
+  const kind = foeKind(n);
+  const foe = foeIncoming;
+  foe.g.position.set(player.x, foe.g.position.y, player.z - DUEL.gap);
+  // clear anything standing between you and them
+  for (let i = entities.length - 1; i >= 0; i--) {
+    const e = entities[i], p = e.g.position;
+    if (e === foe || e.state === 'flying') continue;
+    if (p.z < player.z + 0.5 && p.z > player.z - DUEL.gap - 1.5 && Math.abs(p.x - player.x) < 2.6) {
+      scene.remove(e.g);
+      entities.splice(i, 1);
+    }
+  }
+  const tier = INSULTS[kind][Math.min(n, 3)];
+  const phrase = pick(tier);
+  duel = {
+    n, kind, foe, phrase, typed: 0, t: 0, mistakes: 0,
+    limit: 2 + phrase.length / duelCps(n),
+    phase: 'intro', phaseT: DUEL.introT,
+  };
+  mode = 'duel';
+  keys.left = keys.right = false;
+  pointer = null;
+  const def = FOES[kind];
+  duelEl.round.textContent = `ROUND ${n + 1}` + (n > 0 ? ` · ${'🔥'.repeat(Math.min(n, 5))}` : '');
+  duelEl.name.textContent = pick(def.names);
+  duelEl.says.textContent = '"' + pick(def.intro) + '"';
+  duelEl.prompt.textContent = 'GET READY…';
+  duelEl.prompt.classList.remove('win');
+  duelEl.phrase.innerHTML = '';
+  duelEl.phrase.classList.remove('err');
+  for (const ch of phrase) {
+    const s = document.createElement('span');
+    s.textContent = ch;
+    duelEl.phrase.appendChild(s);
+  }
+  duelEl.input.value = '';
+  duelEl.input.disabled = true;
+  duelEl.fill.style.width = '100%';
+  duelEl.fill.classList.remove('low');
+  duelEl.time.textContent = duel.limit.toFixed(1) + 's';
+  renderPhrase();
+  duelEl.root.classList.remove('hidden');
+}
+
+function renderPhrase() {
+  const spans = duelEl.phrase.children;
+  for (let i = 0; i < spans.length; i++) {
+    spans[i].className = i < duel.typed ? 'ok' : i === duel.typed ? 'cur' : 'todo';
+  }
+}
+
+function focusDuelInput() {
+  if (duel && duel.phase === 'typing') duelEl.input.focus({ preventScroll: true });
+}
+
+function onDuelInput() {
+  const input = duelEl.input;
+  if (!duel || duel.phase !== 'typing') { input.value = ''; return; }
+  const v = input.value, target = duel.phrase;
+  let i = 0;
+  while (i < v.length && i < target.length && v[i].toLowerCase() === target[i].toLowerCase()) i++;
+  if (i < v.length) {
+    // wrong key: it doesn't count, and from round 2 on it costs time
+    duel.mistakes++;
+    duel.t += duelTypoCost(duel.n);
+    duelEl.phrase.classList.remove('err');
+    void duelEl.phrase.offsetWidth;
+    duelEl.phrase.classList.add('err');
+  }
+  input.value = target.slice(0, i);
+  duel.typed = i;
+  renderPhrase();
+  if (i === target.length) finishDuel(true);
+}
+
+function finishDuel(won) {
+  const d = duel;
+  d.phase = 'result';
+  d.phaseT = DUEL.resultT;
+  d.won = won;
+  duelEl.input.disabled = true;
+  duelEl.input.blur();
+  const def = FOES[d.kind];
+  duelEl.says.textContent = '"' + (won ? def.win : def.lose) + '"';
+  if (won) {
+    duelsWon++;
+    timeLeft += DUEL.reward;
+    warned = timeLeft <= 10 && warned;
+    const bonus = 5000 * (d.n + 1) + Math.round(Math.max(0, d.limit - d.t) * 300);
+    score += bonus;
+    duelEl.prompt.textContent = d.mistakes ? 'DEVASTATED!' : 'FLAWLESS! DEVASTATED!';
+    duelEl.prompt.classList.add('win');
+    banner(`+${DUEL.reward} SECONDS!`, '#5dff8a');
+    popup(popPos(d.foe.g.position).add(new V3(0, -0.8, 0)), `+${bonus.toLocaleString()} COMEBACK!`, 'big', 1.6);
+    // they take the insult personally, and physically
+    d.foe.duelist = false;
+    smash(d.foe, player.x, null, 1.9);
+    shake = 1;
+  } else {
+    duelEl.prompt.textContent = 'TOO SLOW!';
+    banner('WRITTEN UP!', '#ff4b4b');
+  }
+}
+
+function endDuel() {
+  const d = duel;
+  if (!d.won) d.foe.leaving = player.x > 0 ? -1 : 1; // the foe walks off; they stay untouchable
+  duel = null;
+  foeIncoming = null;
+  nextDuel += DUEL.every;
+  duelEl.root.classList.add('hidden');
+  keys.left = keys.right = false;
+  mode = 'playing';
+}
+
+function updateDuel(dt) {
+  const d = duel;
+  d.phaseT -= dt;
+  if (d.phase === 'intro') {
+    if (d.phaseT <= 0) {
+      d.phase = 'typing';
+      duelEl.prompt.textContent = 'TYPE YOUR COMEBACK!';
+      duelEl.input.disabled = false;
+      focusDuelInput();
+    }
+  } else if (d.phase === 'typing') {
+    d.t += dt;
+    const left = Math.max(0, d.limit - d.t);
+    duelEl.fill.style.width = (left / d.limit) * 100 + '%';
+    duelEl.fill.classList.toggle('low', left < 3);
+    duelEl.time.textContent = left.toFixed(1) + 's';
+    if (left <= 0) finishDuel(false);
+  } else if (d.phaseT <= 0) {
+    endDuel();
+  }
+}
+
+duelEl.input.addEventListener('input', onDuelInput);
+// keep the keyboard on the duel: clicking anywhere puts focus back in the box
+duelEl.panel.addEventListener('pointerdown', () => setTimeout(focusDuelInput, 0));
+duelEl.input.addEventListener('blur', () => { if (duel && duel.phase === 'typing') setTimeout(focusDuelInput, 0); });
+
+// ---------------------------------------------------------------- input
+const keys = { left: false, right: false };
+let pointer = null; // { id, startX, startPlayerX, targetX }
+addEventListener('keydown', (ev) => {
+  if (mode === 'duel') return; // the typing duel owns the keyboard
+  const k = ev.key;
+  if (k === 'ArrowLeft' || k === 'a' || k === 'A') keys.left = true;
+  if (k === 'ArrowRight' || k === 'd' || k === 'D') keys.right = true;
+  if ((k === ' ' || k === 'Enter') && mode !== 'playing' && overlayReady) { ev.preventDefault(); startGame(); return; }
+  if ((k === ' ' || k === 'w' || k === 'W' || k === 'ArrowUp') && mode === 'playing') { ev.preventDefault(); if (!ev.repeat) swing(); }
+});
+addEventListener('keyup', (ev) => {
+  const k = ev.key;
+  if (k === 'ArrowLeft' || k === 'a' || k === 'A') keys.left = false;
+  if (k === 'ArrowRight' || k === 'd' || k === 'D') keys.right = false;
+});
+addEventListener('blur', () => { keys.left = keys.right = false; pointer = null; });
+// mouse: click swings. touch: drag steers, a quick tap swings.
+canvas.addEventListener('pointerdown', (ev) => {
+  if (mode === 'duel') { ev.preventDefault(); focusDuelInput(); return; }
+  if (ev.pointerType === 'mouse') { if (ev.button === 0) swing(); return; }
+  pointer = { id: ev.pointerId, startX: ev.clientX, startPlayerX: player.x, targetX: player.x, t: performance.now(), moved: 0 };
+});
+addEventListener('pointermove', (ev) => {
+  if (!pointer || ev.pointerId !== pointer.id) return;
+  const span = Math.min(innerWidth, 700);
+  pointer.moved = Math.max(pointer.moved, Math.abs(ev.clientX - pointer.startX));
+  pointer.targetX = clamp(pointer.startPlayerX + ((ev.clientX - pointer.startX) / span) * 20, -CFG.laneHalf, CFG.laneHalf);
+});
+const endPointer = (ev) => {
+  if (!pointer || ev.pointerId !== pointer.id) return;
+  if (ev.type === 'pointerup' && pointer.moved < 14 && performance.now() - pointer.t < 280) swing();
+  pointer = null;
+};
+addEventListener('pointerup', endPointer);
+addEventListener('pointercancel', endPointer);
+
+// ---------------------------------------------------------------- flow
+const hud = { score: $('score'), time: $('time'), combo: $('combo'), comboFill: $('comboFill'), best: $('best'), power: $('powerups') };
+let overlayReady = true;
+
+function clearWorld() {
+  for (const e of entities) scene.remove(e.g);
+  entities.length = 0;
+  for (const c of chunks) scene.remove(c.env);
+  chunks.length = 0;
+  for (const pk of pickups) scene.remove(pk.g);
+  pickups.length = 0;
+  for (const k of keycaps) scene.remove(k.m);
+  keycaps.length = 0;
+  for (const p of particles) { p.m.visible = false; pfree[p.kind].push(p.m); }
+  particles.length = 0;
+  for (const p of pops) p.el.remove();
+  pops.length = 0;
+  nextChunk = 0;
+  player.x = 0; player.z = 0; player.vx = 0;
+  ensureChunks();
+}
+
+function startGame() {
+  clearWorld();
+  score = 0; timeLeft = CFG.gameTime; combo = 0; comboT = 0; maxCombo = 0;
+  warned = false;
+  stats.items = 0; stats.people = 0;
+  playT = 0; nextDuel = DUEL.every; duelCount = 0; duelsWon = 0;
+  duel = null; foeIncoming = null;
+  duelEl.root.classList.add('hidden');
+  unequip();
+  mode = 'playing';
+  $('menu').classList.add('hidden');
+  $('over').classList.add('hidden');
+  $('hint').style.display = 'block';
+  setTimeout(() => { if (mode === 'playing') $('hint').style.display = 'none'; }, 4000);
+  banner("I'VE HAD IT!!!", '#ff4b4b');
+}
+
+function endGame() {
+  mode = 'over';
+  timeLeft = 0;
+  const isBest = score > best;
+  if (isBest) {
+    best = score;
+    try { localStorage.setItem('officeRageBest', String(best)); } catch (e) { /* storage unavailable */ }
+  }
+  banner("TIME'S UP!", '#ff4b4b');
+  $('finalScore').textContent = score.toLocaleString();
+  $('newBest').hidden = !isBest;
+  $('stItems').textContent = stats.items;
+  $('stPeople').textContent = stats.people;
+  $('stCombo').textContent = maxCombo;
+  $('stDist').textContent = Math.round(-player.z) + ' m';
+  $('stDuels').textContent = `${duelsWon} / ${duelCount}`;
+  $('stBest').textContent = best.toLocaleString();
+  overlayReady = false;
+  setTimeout(() => { $('over').classList.remove('hidden'); overlayReady = true; }, 1200);
+}
+
+$('startBtn').addEventListener('click', startGame);
+$('againBtn').addEventListener('click', startGame);
+$('menuBest').textContent = best ? `Your best: ${best.toLocaleString()}` : '';
+
+let lastPower = '';
+function updateHud() {
+  hud.score.textContent = score.toLocaleString();
+  hud.best.textContent = 'BEST ' + Math.max(best, score).toLocaleString();
+  const tl = Math.ceil(timeLeft);
+  hud.time.textContent = tl;
+  hud.time.classList.toggle('warn', mode === 'playing' && timeLeft <= 10);
+  hud.combo.textContent = 'x' + comboMult() + (combo > 1 ? ` · ${combo}` : '');
+  hud.comboFill.style.width = (combo ? (comboT / CFG.comboWindow) * 100 : 0) + '%';
+  const parts = [];
+  if (weapon) {
+    const def = WEAPONS[weapon.kind];
+    parts.push(`<span class="chip" style="color:${def.css}">${def.icon} ${def.name} · ${weapon.uses} swing${weapon.uses === 1 ? '' : 's'} left</span>`);
+  }
+  const html = parts.join('');
+  if (html !== lastPower) { hud.power.innerHTML = html; lastPower = html; }
+  hud.power.style.visibility = mode === 'duel' ? 'hidden' : '';
+}
+
+function update(dt) {
+  time += dt;
+  if (mode === 'playing') {
+    timeLeft -= dt;
+    if (timeLeft <= 10 && !warned) { warned = true; banner('10 SECONDS!', '#ff4b4b'); }
+    if (timeLeft <= 0) endGame();
+    playT += dt;
+    if (mode === 'playing' && !duel) {
+      if (!foeIncoming && playT >= nextDuel - DUEL.approach) spawnFoe();
+      if (playT >= nextDuel) startDuel();
+    }
+    let target;
+    if (pointer) target = clamp((pointer.targetX - player.x) * 9, -18, 18);
+    else target = ((keys.right ? 1 : 0) - (keys.left ? 1 : 0)) * CFG.strafeSpeed;
+    player.vx += (target - player.vx) * Math.min(1, dt * 14);
+    player.x += player.vx * dt;
+    if (Math.abs(player.x) > CFG.laneHalf) { player.x = Math.sign(player.x) * CFG.laneHalf; player.vx = 0; }
+    player.z -= CFG.runSpeed * dt;
+    updateSwing(dt);
+    if (comboT > 0) { comboT -= dt; if (comboT <= 0) combo = 0; }
+  } else {
+    player.vx *= Math.max(0, 1 - dt * 8);
+    if (mode === 'duel') updateDuel(dt);
+  }
+  ensureChunks();
+  updateEntities(dt);
+  updatePickups(dt);
+  updateParticles(dt);
+  updateKeycaps(dt);
+  animatePlayer(dt);
+
+  // camera
+  shake = Math.max(0, shake - dt * 2.5);
+  const sx = (Math.random() - 0.5) * shake * 0.6, sy = (Math.random() - 0.5) * shake * 0.6;
+  // first-person: eyes at head height, bobbing with each stride, rolling into turns
+  const running = mode === 'playing';
+  const bob = running ? Math.abs(Math.sin(player.phase)) * 0.09 : 0;
+  camera.position.set(player.x + sx, 1.72 * player.scale + bob + sy, player.z - 0.1);
+  camPitch += ((mode === 'duel' ? -0.03 : -0.16) - camPitch) * Math.min(1, dt * 4);
+  camera.rotation.set(camPitch + (running ? Math.cos(player.phase * 2) * 0.008 : 0), -player.vx * 0.006,
+    -player.vx * 0.01 + (running ? Math.sin(player.phase) * 0.012 : 0));
+  const fov = mode === 'duel' ? baseFov - 14 : baseFov + Math.min(8, combo * 0.25);
+  if (Math.abs(camera.fov - fov) > 0.05) {
+    camera.fov += (fov - camera.fov) * Math.min(1, dt * 5);
+    camera.updateProjectionMatrix();
+  }
+  sun.position.set(player.x + 6, 22, player.z + 8);
+  sun.target.position.set(player.x, 0, player.z - 12);
+
+  updatePops(dt);
+  updateHud();
+}
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  baseFov = camera.aspect < 1 ? 90 : 75;
+  camera.fov = baseFov;
+  camera.updateProjectionMatrix();
+  armCam.aspect = camera.aspect;
+  armCam.fov = camera.aspect < 1 ? 80 : 60;
+  armCam.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+function render() {
+  renderer.clear();
+  renderer.render(scene, camera);
+  renderer.clearDepth();
+  renderer.render(armScene, armCam);
+}
+
+clearWorld();
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// handy for debugging from the console
+window.__officeRage = { get state() { return { mode, score, timeLeft, combo, entities: entities.length, particles: particles.length }; },
+  get duel() { return duel && { phase: duel.phase, phrase: duel.phrase, typed: duel.typed, limit: duel.limit, t: duel.t, n: duel.n, mistakes: duel.mistakes }; },
+  get duelStats() { return { playT, nextDuel, duelCount, duelsWon }; },
+  skipTo(t) { playT = t; },
+  startGame, equip, swing, step(n = 60) { for (let i = 0; i < n; i++) update(1 / 60); render(); } };
+</script>
+</body>
+</html>
